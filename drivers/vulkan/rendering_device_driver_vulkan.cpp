@@ -1197,6 +1197,9 @@ static_assert(ENUM_MEMBERS_EQUAL(RDD::BUFFER_USAGE_VERTEX_BIT, VK_BUFFER_USAGE_V
 static_assert(ENUM_MEMBERS_EQUAL(RDD::BUFFER_USAGE_INDIRECT_BIT, VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT));
 
 RDD::BufferID RenderingDeviceDriverVulkan::buffer_create(uint64_t p_size, BitField<BufferUsageBits> p_usage, MemoryAllocationType p_allocation_type) {
+	
+	print_line("RenderingDeviceDriverVulkan::buffer_create, p_size: ", p_size, ", p_allocation_type: ", p_allocation_type, ", p_usage: ", p_usage);
+	
 	VkBufferCreateInfo create_info = {};
 	create_info.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
 	create_info.size = p_size;
@@ -1208,6 +1211,7 @@ RDD::BufferID RenderingDeviceDriverVulkan::buffer_create(uint64_t p_size, BitFie
 		case MEMORY_ALLOCATION_TYPE_CPU: {
 			bool is_src = p_usage.has_flag(BUFFER_USAGE_TRANSFER_FROM_BIT);
 			bool is_dst = p_usage.has_flag(BUFFER_USAGE_TRANSFER_TO_BIT);
+			print_line("is_src: ", is_src, ", is_dst: ", is_dst);
 			if (is_src && !is_dst) {
 				// Looks like a staging buffer: CPU maps, writes sequentially, then GPU copies to VRAM.
 				alloc_create_info.flags = VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT;
@@ -1221,11 +1225,19 @@ RDD::BufferID RenderingDeviceDriverVulkan::buffer_create(uint64_t p_size, BitFie
 		} break;
 		case MEMORY_ALLOCATION_TYPE_GPU: {
 			alloc_create_info.usage = VMA_MEMORY_USAGE_AUTO_PREFER_DEVICE;
+			
+			//alloc_create_info.requiredFlags = (VK_MEMORY_PROPERTY_HOST_COHERENT_BIT | VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT);			
+			//alloc_create_info.flags = VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT;
+			//alloc_create_info.flags = VMA_ALLOCATION_CREATE_HOST_ACCESS_RANDOM_BIT;
+
+			print_line("p_size: ", p_size, ", SMALL_ALLOCATION_MAX_SIZE: ", SMALL_ALLOCATION_MAX_SIZE);
 			if (p_size <= SMALL_ALLOCATION_MAX_SIZE) {
 				uint32_t mem_type_index = 0;
 				vmaFindMemoryTypeIndexForBufferInfo(allocator, &create_info, &alloc_create_info, &mem_type_index);
+				print_line("mem_type_index: ", mem_type_index);
 				alloc_create_info.pool = _find_or_create_small_allocs_pool(mem_type_index);
 			}
+			
 		} break;
 	}
 
@@ -3045,6 +3057,9 @@ Vector<uint8_t> RenderingDeviceDriverVulkan::shader_compile_binary_from_spirv(Ve
 }
 
 RDD::ShaderID RenderingDeviceDriverVulkan::shader_create_from_bytecode(const Vector<uint8_t> &p_shader_binary, ShaderDescription &r_shader_desc, String &r_name) {
+	
+	print_line("RenderingDeviceDriverVulkan::shader_create_from_bytecode, r_name: ", r_name);
+	
 	r_shader_desc = {}; // Driver-agnostic.
 	ShaderInfo shader_info; // Driver-specific.
 
@@ -3138,6 +3153,9 @@ RDD::ShaderID RenderingDeviceDriverVulkan::shader_create_from_bytecode(const Vec
 				} break;
 				case UNIFORM_TYPE_UNIFORM_BUFFER: {
 					layout_binding.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+					print_line("UNIFORM_TYPE_UNIFORM_BUFFER");
+					print_line("layout_binding.stageFlags:", layout_binding.stageFlags);
+					print_line("layout_binding.descriptorCount:", layout_binding.descriptorCount);
 				} break;
 				case UNIFORM_TYPE_STORAGE_BUFFER: {
 					layout_binding.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
@@ -4062,6 +4080,9 @@ void RenderingDeviceDriverVulkan::render_pass_free(RenderPassID p_render_pass) {
 static_assert(ARRAYS_COMPATIBLE_FIELDWISE(RDD::RenderPassClearValue, VkClearValue));
 
 void RenderingDeviceDriverVulkan::command_begin_render_pass(CommandBufferID p_cmd_buffer, RenderPassID p_render_pass, FramebufferID p_framebuffer, CommandBufferType p_cmd_buffer_type, const Rect2i &p_rect, VectorView<RenderPassClearValue> p_clear_values) {
+	
+	//print_line("BEGIN RenderingDeviceDriverVulkan::command_begin_render_pass");
+
 	VkRenderPassBeginInfo render_pass_begin = {};
 	render_pass_begin.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
 	render_pass_begin.renderPass = (VkRenderPass)p_render_pass.id;
@@ -4081,14 +4102,19 @@ void RenderingDeviceDriverVulkan::command_begin_render_pass(CommandBufferID p_cm
 #if PRINT_NATIVE_COMMANDS
 	print_line(vformat("vkCmdBeginRenderPass Pass 0x%uX Framebuffer 0x%uX", p_render_pass.id, p_framebuffer.id));
 #endif
+
+	//print_line("END RenderingDeviceDriverVulkan::command_begin_render_pass");
 }
 
 void RenderingDeviceDriverVulkan::command_end_render_pass(CommandBufferID p_cmd_buffer) {
+	//print_line("BEGIN RenderingDeviceDriverVulkan::command_end_render_pass");
 	vkCmdEndRenderPass((VkCommandBuffer)p_cmd_buffer.id);
 
 #if PRINT_NATIVE_COMMANDS
 	print_line("vkCmdEndRenderPass");
 #endif
+
+	//print_line("END RenderingDeviceDriverVulkan::command_end_render_pass");
 }
 
 void RenderingDeviceDriverVulkan::command_next_render_subpass(CommandBufferID p_cmd_buffer, CommandBufferType p_cmd_buffer_type) {
@@ -4144,6 +4170,7 @@ void RenderingDeviceDriverVulkan::command_bind_render_pipeline(CommandBufferID p
 void RenderingDeviceDriverVulkan::command_bind_render_uniform_set(CommandBufferID p_cmd_buffer, UniformSetID p_uniform_set, ShaderID p_shader, uint32_t p_set_index) {
 	const ShaderInfo *shader_info = (const ShaderInfo *)p_shader.id;
 	const UniformSetInfo *usi = (const UniformSetInfo *)p_uniform_set.id;
+	//print_line("vkCmdBindDescriptorSets: ", itos(p_cmd_buffer.id), VK_PIPELINE_BIND_POINT_GRAPHICS, p_set_index, 1, 0);
 	vkCmdBindDescriptorSets((VkCommandBuffer)p_cmd_buffer.id, VK_PIPELINE_BIND_POINT_GRAPHICS, shader_info->vk_pipeline_layout, p_set_index, 1, &usi->vk_descriptor_set, 0, nullptr);
 }
 
@@ -4152,6 +4179,17 @@ void RenderingDeviceDriverVulkan::command_render_draw(CommandBufferID p_cmd_buff
 }
 
 void RenderingDeviceDriverVulkan::command_render_draw_indexed(CommandBufferID p_cmd_buffer, uint32_t p_index_count, uint32_t p_instance_count, uint32_t p_first_index, int32_t p_vertex_offset, uint32_t p_first_instance) {
+	
+	//char adr[50];
+	
+	//snprintf(adr, 50, "%p, %p", (void *)&p_cmd_buffer, (void *)&(p_cmd_buffer.id));
+	//print_line("ADR p_cmd_buffer: ", vformat("%s", adr));
+	
+	//VkCommandBuffer vk_cmd_buf = (VkCommandBuffer)p_cmd_buffer.id;
+	//snprintf(adr, 50, "%p", (void *)&vk_cmd_buf);
+	//print_line("ADR vk_cmd_buf: ", vformat("%s", adr));
+
+	//print_line("vkCmdDrawIndexed: ", p_index_count, p_instance_count, p_first_index, p_vertex_offset, p_first_instance);
 	vkCmdDrawIndexed((VkCommandBuffer)p_cmd_buffer.id, p_index_count, p_instance_count, p_first_index, p_vertex_offset, p_first_instance);
 }
 

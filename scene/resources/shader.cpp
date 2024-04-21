@@ -230,6 +230,11 @@ Shader::~Shader() {
 ////////////
 
 Ref<Resource> ResourceFormatLoaderShader::load(const String &p_path, const String &p_original_path, Error *r_error, bool p_use_sub_threads, float *r_progress, CacheMode p_cache_mode) {
+	
+	//print_line("ResourceFormatLoaderShader::load");
+	//print_line("p_path: ", p_path);
+	//print_line("p_original_path: ", p_original_path);
+	
 	if (r_error) {
 		*r_error = ERR_FILE_CANT_OPEN;
 	}

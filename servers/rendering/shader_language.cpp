@@ -7995,6 +7995,9 @@ Error ShaderLanguage::_validate_precision(DataType p_type, DataPrecision p_preci
 }
 
 Error ShaderLanguage::_parse_shader(const HashMap<StringName, FunctionInfo> &p_functions, const Vector<ModeInfo> &p_render_modes, const HashSet<String> &p_shader_types) {
+	
+	print_line("ShaderLanguage::_parse_shader");
+	
 	Token tk;
 	TkPos prev_pos;
 	Token next;
@@ -9989,6 +9992,9 @@ uint32_t ShaderLanguage::get_warning_flags() const {
 #endif // DEBUG_ENABLED
 
 Error ShaderLanguage::compile(const String &p_code, const ShaderCompileInfo &p_info) {
+
+	print_line("ShaderLanguage::compile: p_code.size: ", p_code.size());
+
 	clear();
 	is_shader_inc = p_info.is_include;
 
@@ -10015,6 +10021,11 @@ Error ShaderLanguage::compile(const String &p_code, const ShaderCompileInfo &p_i
 }
 
 Error ShaderLanguage::complete(const String &p_code, const ShaderCompileInfo &p_info, List<ScriptLanguage::CodeCompletionOption> *r_options, String &r_call_hint) {
+	
+	print_line("ShaderLanguage::complete");
+	print_line("p_code.size: ", p_code.size());
+
+	
 	clear();
 	is_shader_inc = p_info.is_include;
 

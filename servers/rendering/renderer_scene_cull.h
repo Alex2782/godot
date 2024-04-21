@@ -487,6 +487,10 @@ public:
 		DependencyTracker dependency_tracker;
 
 		static void dependency_changed(Dependency::DependencyChangedNotification p_notification, DependencyTracker *tracker) {
+			
+			print_line("BEGIN static void dependency_changed");
+			print_line("p_notification: ", p_notification);
+			
 			Instance *instance = (Instance *)tracker->userdata;
 			switch (p_notification) {
 				case Dependency::DEPENDENCY_CHANGED_SKELETON_DATA:
@@ -519,6 +523,8 @@ public:
 					// Ignored notifications.
 				} break;
 			}
+
+			print_line("END static void dependency_changed");
 		}
 
 		static void dependency_deleted(const RID &p_dependency, DependencyTracker *tracker) {

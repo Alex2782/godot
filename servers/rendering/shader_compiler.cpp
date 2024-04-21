@@ -947,6 +947,7 @@ String ShaderCompiler::_dump_node_code(const SL::Node *p_node, int p_level, Gene
 							code = actions.base_uniform_string + _mkid(vnode->name); //texture, use as is
 							//global variable, this means the code points to an index to the global table
 							code = _get_global_shader_uniform_from_type_and_index(p_default_actions.global_buffer_array_variable, code, u.type);
+							print_line("CODE: ", code);
 						} else if (u.scope == ShaderLanguage::ShaderNode::Uniform::SCOPE_INSTANCE) {
 							//instance variable, index it as such
 							code = "(" + p_default_actions.instance_uniform_index_variable + "+" + itos(u.instance_index) + ")";
@@ -954,6 +955,7 @@ String ShaderCompiler::_dump_node_code(const SL::Node *p_node, int p_level, Gene
 						} else {
 							//regular uniform, index from UBO
 							code = actions.base_uniform_string + _mkid(vnode->name);
+							print_line("CODE: ", code);
 						}
 					}
 
@@ -1047,6 +1049,7 @@ String ShaderCompiler::_dump_node_code(const SL::Node *p_node, int p_level, Gene
 							code = actions.base_uniform_string + _mkid(anode->name); //texture, use as is
 							//global variable, this means the code points to an index to the global table
 							code = _get_global_shader_uniform_from_type_and_index(p_default_actions.global_buffer_array_variable, code, u.type);
+							print_line("CODE: ", code);
 						} else if (u.scope == ShaderLanguage::ShaderNode::Uniform::SCOPE_INSTANCE) {
 							//instance variable, index it as such
 							code = "(" + p_default_actions.instance_uniform_index_variable + "+" + itos(u.instance_index) + ")";
@@ -1054,6 +1057,7 @@ String ShaderCompiler::_dump_node_code(const SL::Node *p_node, int p_level, Gene
 						} else {
 							//regular uniform, index from UBO
 							code = actions.base_uniform_string + _mkid(anode->name);
+							print_line("CODE: ", code);
 						}
 					}
 				} else {
@@ -1456,6 +1460,13 @@ ShaderLanguage::DataType ShaderCompiler::_get_global_shader_uniform_type(const S
 }
 
 Error ShaderCompiler::compile(RS::ShaderMode p_mode, const String &p_code, IdentifierActions *p_actions, const String &p_path, GeneratedCode &r_gen_code) {
+	
+	print_line("ShaderCompiler::compile");
+	print_line("p_mode", p_mode);
+	print_line("p_code.size:", p_code.size());
+	print_line("p_path:", p_path);
+
+	
 	SL::ShaderCompileInfo info;
 	info.functions = ShaderTypes::get_singleton()->get_functions(p_mode);
 	info.render_modes = ShaderTypes::get_singleton()->get_modes(p_mode);

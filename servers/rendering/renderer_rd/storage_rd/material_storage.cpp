@@ -1849,6 +1849,9 @@ void MaterialStorage::shader_free(RID p_rid) {
 }
 
 void MaterialStorage::shader_set_code(RID p_shader, const String &p_code) {
+
+	print_line("BEGIN MaterialStorage::shader_set_code");
+
 	Shader *shader = shader_owner.get_or_null(p_shader);
 	ERR_FAIL_NULL(shader);
 
@@ -1915,14 +1918,18 @@ void MaterialStorage::shader_set_code(RID p_shader, const String &p_code) {
 
 	if (shader->data) {
 		shader->data->set_path_hint(shader->path_hint);
+		print_line("shader->data->set_code");
 		shader->data->set_code(p_code);
 	}
 
 	for (Material *E : shader->owners) {
 		Material *material = E;
 		material->dependency.changed_notify(Dependency::DEPENDENCY_CHANGED_MATERIAL);
+		print_line("_material_queue_update");
 		_material_queue_update(material, true, true);
 	}
+
+	print_line("END MaterialStorage::shader_set_code");
 }
 
 void MaterialStorage::shader_set_path_hint(RID p_shader, const String &p_path) {
@@ -2032,6 +2039,7 @@ void MaterialStorage::_material_queue_update(Material *material, bool p_uniform,
 		return;
 	}
 
+	print_line("material_update_list.add");
 	material_update_list.add(&material->update_element);
 }
 
@@ -2048,6 +2056,8 @@ void MaterialStorage::_update_queued_materials() {
 
 		material_update_list.remove(&material->update_element);
 
+		print_line("MaterialStorage::_update_queued_materials: uniforms_changed: ", uniforms_changed);
+		
 		if (uniforms_changed) {
 			//some implementations such as 3D renderer cache the material uniform set, so update is required
 			material->dependency.changed_notify(Dependency::DEPENDENCY_CHANGED_MATERIAL);

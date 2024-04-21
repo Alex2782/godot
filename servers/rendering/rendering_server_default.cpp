@@ -69,17 +69,22 @@ void RenderingServerDefault::request_frame_drawn_callback(const Callable &p_call
 }
 
 void RenderingServerDefault::_draw(bool p_swap_buffers, double frame_step) {
+
+	//print_line("BEGIN RenderingServerDefault::_draw: p_swap_buffers: ", p_swap_buffers, "frame_step: ", frame_step);
+
 	//needs to be done before changes is reset to 0, to not force the editor to redraw
 	RS::get_singleton()->emit_signal(SNAME("frame_pre_draw"));
 
 	changes = 0;
 
+	//print_line("RSG::rasterizer->begin_frame");
 	RSG::rasterizer->begin_frame(frame_step);
 
 	TIMESTAMP_BEGIN()
 
 	uint64_t time_usec = OS::get_singleton()->get_ticks_usec();
 
+	//print_line("RSG::scene->update()");
 	RSG::scene->update(); //update scenes stuff before updating instances
 
 	frame_setup_time = double(OS::get_singleton()->get_ticks_usec() - time_usec) / 1000.0;
@@ -88,9 +93,11 @@ void RenderingServerDefault::_draw(bool p_swap_buffers, double frame_step) {
 
 	RSG::scene->render_probes();
 
+	//print_line("RSG::viewport->draw_viewports");
 	RSG::viewport->draw_viewports(p_swap_buffers);
 	RSG::canvas_render->update();
 
+	//print_line("RSG::rasterizer->end_frame");
 	RSG::rasterizer->end_frame(p_swap_buffers);
 
 #ifndef _3D_DISABLED
@@ -101,7 +108,9 @@ void RenderingServerDefault::_draw(bool p_swap_buffers, double frame_step) {
 	}
 #endif // _3D_DISABLED
 
+	//print_line("RSG::canvas->update_visibility_notifiers");
 	RSG::canvas->update_visibility_notifiers();
+	//print_line("RSG::scene->update_visibility_notifiers");
 	RSG::scene->update_visibility_notifiers();
 
 	while (frame_drawn_callbacks.front()) {
@@ -194,6 +203,8 @@ void RenderingServerDefault::_draw(bool p_swap_buffers, double frame_step) {
 	}
 
 	RSG::utilities->update_memory_info();
+
+	//print_line("END RenderingServerDefault::_draw: p_swap_buffers: ");
 }
 
 double RenderingServerDefault::get_frame_setup_time_cpu() const {

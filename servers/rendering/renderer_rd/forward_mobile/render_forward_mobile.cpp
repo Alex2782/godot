@@ -304,6 +304,9 @@ bool RenderForwardMobile::_render_buffers_can_be_storage() {
 }
 
 RID RenderForwardMobile::_setup_render_pass_uniform_set(RenderListType p_render_list, const RenderDataRD *p_render_data, RID p_radiance_texture, const RendererRD::MaterialStorage::Samplers &p_samplers, bool p_use_directional_shadow_atlas, int p_index) {
+	
+	print_line("BEGIN RenderForwardMobile::_setup_render_pass_uniform_set");
+	
 	RendererRD::LightStorage *light_storage = RendererRD::LightStorage::get_singleton();
 	RendererRD::TextureStorage *texture_storage = RendererRD::TextureStorage::get_singleton();
 
@@ -548,6 +551,9 @@ RID RenderForwardMobile::_setup_render_pass_uniform_set(RenderListType p_render_
 	}
 
 	render_pass_uniform_sets[p_index] = RD::get_singleton()->uniform_set_create(uniforms, scene_shader.default_shader_rd, RENDER_PASS_UNIFORM_SET);
+	
+	print_line("END RenderForwardMobile::_setup_render_pass_uniform_set");
+	
 	return render_pass_uniform_sets[p_index];
 }
 
@@ -2690,6 +2696,10 @@ void RenderForwardMobile::_update_dirty_geometry_instances() {
 }
 
 void RenderForwardMobile::_geometry_instance_dependency_changed(Dependency::DependencyChangedNotification p_notification, DependencyTracker *p_tracker) {
+	
+	//print_line("BEGIN RenderForwardMobile::_geometry_instance_dependency_changed");
+	//print_line("p_notification:", p_notification);
+	
 	switch (p_notification) {
 		case Dependency::DEPENDENCY_CHANGED_MATERIAL:
 		case Dependency::DEPENDENCY_CHANGED_MESH:
@@ -2709,6 +2719,8 @@ void RenderForwardMobile::_geometry_instance_dependency_changed(Dependency::Depe
 			//rest of notifications of no interest
 		} break;
 	}
+
+	//print_line("END RenderForwardMobile::_geometry_instance_dependency_changed");
 }
 void RenderForwardMobile::_geometry_instance_dependency_deleted(const RID &p_dependency, DependencyTracker *p_tracker) {
 	static_cast<RenderGeometryInstance *>(p_tracker->userdata)->_mark_dirty();

@@ -4052,6 +4052,10 @@ void RenderForwardClustered::_update_dirty_geometry_instances() {
 }
 
 void RenderForwardClustered::_geometry_instance_dependency_changed(Dependency::DependencyChangedNotification p_notification, DependencyTracker *p_tracker) {
+	
+	//print_line("BEGIN RenderForwardClustered::_geometry_instance_dependency_changed");
+	//print_line("p_notification: ", p_notification);
+	
 	switch (p_notification) {
 		case Dependency::DEPENDENCY_CHANGED_MATERIAL:
 		case Dependency::DEPENDENCY_CHANGED_MESH:
@@ -4072,6 +4076,8 @@ void RenderForwardClustered::_geometry_instance_dependency_changed(Dependency::D
 			//rest of notifications of no interest
 		} break;
 	}
+
+	//print_line("END RenderForwardClustered::_geometry_instance_dependency_changed");
 }
 void RenderForwardClustered::_geometry_instance_dependency_deleted(const RID &p_dependency, DependencyTracker *p_tracker) {
 	static_cast<RenderGeometryInstance *>(p_tracker->userdata)->_mark_dirty();

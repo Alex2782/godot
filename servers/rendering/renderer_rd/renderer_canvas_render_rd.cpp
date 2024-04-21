@@ -1131,7 +1131,7 @@ RID RendererCanvasRenderRD::_create_base_uniform_set(RID p_to_render_target, boo
 	{
 		RD::Uniform u;
 		u.uniform_type = RD::UNIFORM_TYPE_STORAGE_BUFFER;
-		u.binding = 9;
+		u.binding = 9; //TODO
 		u.append_id(RendererRD::MaterialStorage::get_singleton()->global_shader_uniforms_get_storage_buffer());
 		uniforms.push_back(u);
 	}
@@ -2209,7 +2209,8 @@ void RendererCanvasRenderRD::CanvasShaderData::set_code(const String &p_code) {
 		version = canvas_singleton->shader.canvas_shader.version_create();
 	}
 
-#if 0
+//TODO DEBUG
+#if 1
 	print_line("**compiling shader:");
 	print_line("**defines:\n");
 	for (int i = 0; i < gen_code.defines.size(); i++) {
@@ -2442,7 +2443,7 @@ RendererCanvasRenderRD::RendererCanvasRenderRD() {
 		if (uniform_max_size < 65536) {
 			//Yes, you guessed right, ARM again
 			state.max_lights_per_render = 64;
-			global_defines += "#define MAX_LIGHTS 64\n";
+			global_defines += "#define MAX_LIGHTS 64\n";		
 		} else {
 			state.max_lights_per_render = DEFAULT_MAX_LIGHTS_PER_RENDER;
 			global_defines += "#define MAX_LIGHTS " + itos(DEFAULT_MAX_LIGHTS_PER_RENDER) + "\n";

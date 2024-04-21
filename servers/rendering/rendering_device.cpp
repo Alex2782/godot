@@ -238,6 +238,7 @@ RenderingDevice::Buffer *RenderingDevice::_get_buffer_from_owner(RID p_buffer) {
 Error RenderingDevice::_insert_staging_block() {
 	StagingBufferBlock block;
 
+	print_line("RenderingDevice::_insert_staging_block(), driver->buffer_create: RDD::BUFFER_USAGE_TRANSFER_FROM_BIT, RDD::MEMORY_ALLOCATION_TYPE_CPU");
 	block.driver_id = driver->buffer_create(staging_buffer_block_size, RDD::BUFFER_USAGE_TRANSFER_FROM_BIT, RDD::MEMORY_ALLOCATION_TYPE_CPU);
 	ERR_FAIL_COND_V(!block.driver_id, ERR_CANT_CREATE);
 
@@ -560,6 +561,7 @@ Vector<uint8_t> RenderingDevice::buffer_get_data(RID p_buffer, uint32_t p_offset
 				"Size is larger than the buffer.");
 	}
 
+	print_line("RenderingDevice::buffer_get_data(), driver->buffer_create: RDD::BUFFER_USAGE_TRANSFER_TO_BIT, RDD::MEMORY_ALLOCATION_TYPE_CPU");
 	RDD::BufferID tmp_buffer = driver->buffer_create(buffer->size, RDD::BUFFER_USAGE_TRANSFER_TO_BIT, RDD::MEMORY_ALLOCATION_TYPE_CPU);
 	ERR_FAIL_COND_V(!tmp_buffer, Vector<uint8_t>());
 
@@ -600,6 +602,8 @@ RID RenderingDevice::storage_buffer_create(uint32_t p_size_bytes, const Vector<u
 	if (p_usage.has_flag(STORAGE_BUFFER_USAGE_DISPATCH_INDIRECT)) {
 		buffer.usage.set_flag(RDD::BUFFER_USAGE_INDIRECT_BIT);
 	}
+
+	print_line("RenderingDevice::storage_buffer_create(), driver->buffer_create: buffer.usage:", buffer.usage, ", RDD::MEMORY_ALLOCATION_TYPE_GPU");
 	buffer.driver_id = driver->buffer_create(buffer.size, buffer.usage, RDD::MEMORY_ALLOCATION_TYPE_GPU);
 	ERR_FAIL_COND_V(!buffer.driver_id, RID());
 
@@ -632,6 +636,8 @@ RID RenderingDevice::texture_buffer_create(uint32_t p_size_elements, DataFormat 
 	Buffer texture_buffer;
 	texture_buffer.size = size_bytes;
 	BitField<RDD::BufferUsageBits> usage = (RDD::BUFFER_USAGE_TRANSFER_FROM_BIT | RDD::BUFFER_USAGE_TRANSFER_TO_BIT | RDD::BUFFER_USAGE_TEXEL_BIT);
+	
+	print_line("RenderingDevice::texture_buffer_create(), driver->buffer_create: buffer.usage:", usage, ", RDD::MEMORY_ALLOCATION_TYPE_GPU");
 	texture_buffer.driver_id = driver->buffer_create(size_bytes, usage, RDD::MEMORY_ALLOCATION_TYPE_GPU);
 	ERR_FAIL_COND_V(!texture_buffer.driver_id, RID());
 
@@ -1344,6 +1350,7 @@ Vector<uint8_t> RenderingDevice::texture_get_data(RID p_texture, uint32_t p_laye
 			work_buffer_size = STEPIFY(work_buffer_size, work_mip_alignment) + mip_layouts[i].size;
 		}
 
+		print_line("RenderingDevice::texture_get_data(), driver->buffer_create: RDD::BUFFER_USAGE_TRANSFER_TO_BIT, RDD::MEMORY_ALLOCATION_TYPE_CPU");
 		RDD::BufferID tmp_buffer = driver->buffer_create(work_buffer_size, RDD::BUFFER_USAGE_TRANSFER_TO_BIT, RDD::MEMORY_ALLOCATION_TYPE_CPU);
 		ERR_FAIL_COND_V(!tmp_buffer, Vector<uint8_t>());
 
@@ -2157,6 +2164,8 @@ RID RenderingDevice::vertex_buffer_create(uint32_t p_size_bytes, const Vector<ui
 	if (p_use_as_storage) {
 		buffer.usage.set_flag(RDD::BUFFER_USAGE_STORAGE_BIT);
 	}
+
+	print_line("RenderingDevice::vertex_buffer_create(), driver->buffer_create: buffer.usage: ", buffer.usage, ", RDD::MEMORY_ALLOCATION_TYPE_GPU");
 	buffer.driver_id = driver->buffer_create(buffer.size, buffer.usage, RDD::MEMORY_ALLOCATION_TYPE_GPU);
 	ERR_FAIL_COND_V(!buffer.driver_id, RID());
 
@@ -2321,6 +2330,8 @@ RID RenderingDevice::index_buffer_create(uint32_t p_index_count, IndexBufferForm
 #endif
 	index_buffer.size = size_bytes;
 	index_buffer.usage = (RDD::BUFFER_USAGE_TRANSFER_FROM_BIT | RDD::BUFFER_USAGE_TRANSFER_TO_BIT | RDD::BUFFER_USAGE_INDEX_BIT);
+	
+	print_line("RenderingDevice::index_buffer_create(), driver->buffer_create: index_buffer.usage: ", index_buffer.usage, ", RDD::MEMORY_ALLOCATION_TYPE_GPU");
 	index_buffer.driver_id = driver->buffer_create(index_buffer.size, index_buffer.usage, RDD::MEMORY_ALLOCATION_TYPE_GPU);
 	ERR_FAIL_COND_V(!index_buffer.driver_id, RID());
 
@@ -2502,7 +2513,10 @@ RID RenderingDevice::uniform_buffer_create(uint32_t p_size_bytes, const Vector<u
 
 	Buffer buffer;
 	buffer.size = p_size_bytes;
-	buffer.usage = (RDD::BUFFER_USAGE_TRANSFER_TO_BIT | RDD::BUFFER_USAGE_UNIFORM_BIT);
+	//buffer.usage = (RDD::BUFFER_USAGE_TRANSFER_TO_BIT | RDD::BUFFER_USAGE_UNIFORM_BIT);
+	buffer.usage = (RDD::BUFFER_USAGE_UNIFORM_BIT);
+
+	print_line("RenderingDevice::uniform_buffer_create(), driver->buffer_create: buffer.usage: ", buffer.usage, ", RDD::MEMORY_ALLOCATION_TYPE_GPU");
 	buffer.driver_id = driver->buffer_create(buffer.size, buffer.usage, RDD::MEMORY_ALLOCATION_TYPE_GPU);
 	ERR_FAIL_COND_V(!buffer.driver_id, RID());
 
@@ -2512,13 +2526,16 @@ RID RenderingDevice::uniform_buffer_create(uint32_t p_size_bytes, const Vector<u
 		buffer.draw_tracker->buffer_driver_id = buffer.driver_id;
 	}
 
+	print_line("p_data.size(): ", p_data.size());
 	if (p_data.size()) {
 		_buffer_update(&buffer, RID(), 0, p_data.ptr(), p_data.size());
 	}
 
 	buffer_memory += buffer.size;
+	print_line("buffer_memory: ", buffer_memory);
 
 	RID id = uniform_buffer_owner.make_rid(buffer);
+	print_line("id: ", itos(id.get_id()));
 #ifdef DEV_ENABLED
 	set_resource_name(id, "RID:" + itos(id.get_id()));
 #endif
@@ -4704,12 +4721,20 @@ String RenderingDevice::get_device_pipeline_cache_uuid() const {
 void RenderingDevice::swap_buffers() {
 	_THREAD_SAFE_METHOD_
 
+	//print_line("BEGIN RenderingDevice::swap_buffers()");
+
+	//print_line("_end_frame();");
 	_end_frame();
+	//print_line("_execute_frame(true)");
 	_execute_frame(true);
 
 	// Advance to the next frame and begin recording again.
 	frame = (frame + 1) % frames.size();
+
+	//print_line("_begin_frame(), frame: ", frame);
 	_begin_frame();
+
+	//print_line("END RenderingDevice::swap_buffers()");
 }
 
 void RenderingDevice::submit() {
@@ -4872,9 +4897,13 @@ void RenderingDevice::_end_frame() {
 		ERR_PRINT("Found open compute list at the end of the frame, this should never happen (further compute will likely not work).");
 	}
 
+	//print_line("draw_graph.end, frame: ", frame);
 	draw_graph.end(frames[frame].draw_command_buffer, RENDER_GRAPH_REORDER, RENDER_GRAPH_FULL_BARRIERS);
+	//print_line("driver->command_buffer_end(frames[frame].setup_command_buffer);");
 	driver->command_buffer_end(frames[frame].setup_command_buffer);
+	//print_line("driver->command_buffer_end(frames[frame].draw_command_buffer);");
 	driver->command_buffer_end(frames[frame].draw_command_buffer);
+	//print_line("driver->end_segment();");
 	driver->end_segment();
 }
 

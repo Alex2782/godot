@@ -102,6 +102,9 @@ void ShaderRD::_add_stage(const char *p_code, StageType p_stage_type) {
 }
 
 void ShaderRD::setup(const char *p_vertex_code, const char *p_fragment_code, const char *p_compute_code, const char *p_name) {
+	
+	print_line("ShaderRD::setup, p_name:", p_name);
+	
 	name = p_name;
 
 	if (p_compute_code) {
@@ -175,6 +178,9 @@ void ShaderRD::_clear_version(Version *p_version) {
 }
 
 void ShaderRD::_build_variant_code(StringBuilder &builder, uint32_t p_variant, const Version *p_version, const StageTemplate &p_template) {
+	
+	//print_line("ShaderRD::_build_variant_code");
+	
 	for (const StageTemplate::Chunk &chunk : p_template.chunks) {
 		switch (chunk.type) {
 			case StageTemplate::Chunk::TYPE_VERSION_DEFINES: {
@@ -221,6 +227,9 @@ void ShaderRD::_build_variant_code(StringBuilder &builder, uint32_t p_variant, c
 }
 
 void ShaderRD::_compile_variant(uint32_t p_variant, const CompileData *p_data) {
+
+	//print_line("BEGIN ShaderRD::_compile_variant");
+
 	uint32_t variant = group_to_variant_map[p_data->group][p_variant];
 
 	if (!variants_enabled[variant]) {
@@ -242,6 +251,8 @@ void ShaderRD::_compile_variant(uint32_t p_variant, const CompileData *p_data) {
 
 		current_source = builder.as_string();
 		RD::ShaderStageSPIRVData stage;
+
+		//print_line("VERTEX: shader_compile_spirv_from_source, code:\n" + current_source.get_with_code_lines());
 		stage.spirv = RD::get_singleton()->shader_compile_spirv_from_source(RD::SHADER_STAGE_VERTEX, current_source, RD::SHADER_LANGUAGE_GLSL, &error);
 		if (stage.spirv.size() == 0) {
 			build_ok = false;
@@ -260,6 +271,8 @@ void ShaderRD::_compile_variant(uint32_t p_variant, const CompileData *p_data) {
 
 		current_source = builder.as_string();
 		RD::ShaderStageSPIRVData stage;
+
+		//print_line("FRAGMENT: shader_compile_spirv_from_source, code:\n" + current_source.get_with_code_lines());
 		stage.spirv = RD::get_singleton()->shader_compile_spirv_from_source(RD::SHADER_STAGE_FRAGMENT, current_source, RD::SHADER_LANGUAGE_GLSL, &error);
 		if (stage.spirv.size() == 0) {
 			build_ok = false;
@@ -287,6 +300,8 @@ void ShaderRD::_compile_variant(uint32_t p_variant, const CompileData *p_data) {
 			stages.push_back(stage);
 		}
 	}
+	
+	//print_line("build_ok: ", build_ok);
 
 	if (!build_ok) {
 		MutexLock lock(variant_set_mutex); //properly print the errors
@@ -299,16 +314,19 @@ void ShaderRD::_compile_variant(uint32_t p_variant, const CompileData *p_data) {
 		return;
 	}
 
+	//print_line("shader_compile_binary_from_spirv, name: ", name + ":" + itos(variant));
 	Vector<uint8_t> shader_data = RD::get_singleton()->shader_compile_binary_from_spirv(stages, name + ":" + itos(variant));
 
 	ERR_FAIL_COND(shader_data.is_empty());
 
 	{
 		MutexLock lock(variant_set_mutex);
-
+		//print_line("shader_create_from_bytecode");
 		p_data->version->variants[variant] = RD::get_singleton()->shader_create_from_bytecode(shader_data, p_data->version->variants[variant]);
 		p_data->version->variant_data[variant] = shader_data;
 	}
+
+	//print_line("END ShaderRD::_compile_variant");
 }
 
 RS::ShaderNativeSourceCode ShaderRD::version_get_native_source_code(RID p_version) {
@@ -403,7 +421,13 @@ String ShaderRD::_get_cache_file_path(Version *p_version, int p_group) {
 }
 
 bool ShaderRD::_load_from_cache(Version *p_version, int p_group) {
+
+	print_line("ShaderRD::_load_from_cache");
+
 	const String &path = _get_cache_file_path(p_version, p_group);
+
+	print_line("path: ", path);
+
 	Ref<FileAccess> f = FileAccess::open(path, FileAccess::READ);
 	if (f.is_null()) {
 		return false;
@@ -498,6 +522,9 @@ void ShaderRD::_allocate_placeholders(Version *p_version, int p_group) {
 // Try to compile all variants for a given group.
 // Will skip variants that are disabled.
 void ShaderRD::_compile_version(Version *p_version, int p_group) {
+
+	//print_line("ShaderRD::_compile_version");
+
 	if (!group_enabled[p_group]) {
 		return;
 	}
