@@ -159,6 +159,8 @@ Error RenderingContextDriverVulkan::_initialize_instance_extensions() {
 Error RenderingContextDriverVulkan::_find_validation_layers(TightLocalVector<const char *> &r_layer_names) const {
 	r_layer_names.clear();
 
+	print_line("RenderingContextDriverVulkan::_find_validation_layers");
+
 	uint32_t instance_layer_count = 0;
 	VkResult err = vkEnumerateInstanceLayerProperties(&instance_layer_count, nullptr);
 	ERR_FAIL_COND_V(err != VK_SUCCESS, ERR_CANT_CREATE);
@@ -169,7 +171,7 @@ Error RenderingContextDriverVulkan::_find_validation_layers(TightLocalVector<con
 		ERR_FAIL_COND_V(err != VK_SUCCESS, ERR_CANT_CREATE);
 
 		// Preferred set of validation layers.
-		const std::initializer_list<const char *> preferred = { "VK_LAYER_KHRONOS_validation" };
+		const std::initializer_list<const char *> preferred = { "VK_LAYER_KHRONOS_validation", "VK_LAYER_ADRENO_debug" };
 
 		// Alternative (deprecated, removed in SDK 1.1.126.0) set of validation layers.
 		const std::initializer_list<const char *> lunarg = { "VK_LAYER_LUNARG_standard_validation" };
@@ -184,6 +186,9 @@ Error RenderingContextDriverVulkan::_find_validation_layers(TightLocalVector<con
 				layers_found = false;
 
 				for (const VkLayerProperties &properties : layer_properties) {
+
+					print_line("InstanceLayerProperty: ", properties.layerName, properties.implementationVersion, properties.description);
+
 					if (!strcmp(properties.layerName, layer_name)) {
 						layers_found = true;
 						break;
@@ -198,6 +203,7 @@ Error RenderingContextDriverVulkan::_find_validation_layers(TightLocalVector<con
 			if (layers_found) {
 				r_layer_names.reserve(list.size());
 				for (const char *layer_name : list) {
+					print_line("layer_name: ", layer_name);
 					r_layer_names.push_back(layer_name);
 				}
 

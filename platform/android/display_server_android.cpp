@@ -580,6 +580,9 @@ void DisplayServerAndroid::notify_surface_changed(int p_width, int p_height) {
 }
 
 DisplayServerAndroid::DisplayServerAndroid(const String &p_rendering_driver, DisplayServer::WindowMode p_mode, DisplayServer::VSyncMode p_vsync_mode, uint32_t p_flags, const Vector2i *p_position, const Vector2i &p_resolution, int p_screen, Error &r_error) {
+	
+	print_line("BEGIN DisplayServerAndroid::DisplayServerAndroid, p_rendering_driver: ", p_rendering_driver);
+	
 	rendering_driver = p_rendering_driver;
 
 	keep_screen_on = GLOBAL_GET("display/window/energy_saving/keep_screen_on");
@@ -635,9 +638,12 @@ DisplayServerAndroid::DisplayServerAndroid(const String &p_rendering_driver, Dis
 		rendering_context->window_set_vsync_mode(MAIN_WINDOW_ID, p_vsync_mode);
 
 		rendering_device = memnew(RenderingDevice);
+		print_line("rendering_device->initialize");
 		rendering_device->initialize(rendering_context, MAIN_WINDOW_ID);
+		print_line("rendering_device->screen_create");
 		rendering_device->screen_create(MAIN_WINDOW_ID);
 
+		print_line("RendererCompositorRD::make_current()");
 		RendererCompositorRD::make_current();
 	}
 #endif
@@ -646,6 +652,8 @@ DisplayServerAndroid::DisplayServerAndroid(const String &p_rendering_driver, Dis
 	Input::get_singleton()->set_use_input_buffering(true); // Needed because events will come directly from the UI thread
 
 	r_error = OK;
+
+	print_line("END DisplayServerAndroid::DisplayServerAndroid");
 }
 
 DisplayServerAndroid::~DisplayServerAndroid() {

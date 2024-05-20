@@ -1184,6 +1184,8 @@ Vector<String> DisplayServer::get_create_function_rendering_drivers(int p_index)
 }
 
 DisplayServer *DisplayServer::create(int p_index, const String &p_rendering_driver, WindowMode p_mode, VSyncMode p_vsync_mode, uint32_t p_flags, const Vector2i *p_position, const Vector2i &p_resolution, int p_screen, Error &r_error) {
+	
+	print_line("DisplayServer::create, p_index: ", p_index, "p_rendering_driver: ", p_rendering_driver);
 	ERR_FAIL_INDEX_V(p_index, server_create_count, nullptr);
 	return server_create_functions[p_index].create_function(p_rendering_driver, p_mode, p_vsync_mode, p_flags, p_position, p_resolution, p_screen, r_error);
 }

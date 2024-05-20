@@ -1877,10 +1877,16 @@ RenderingDevice *RenderingServer::get_rendering_device() const {
 }
 
 RenderingDevice *RenderingServer::create_local_rendering_device() const {
+
+	print_line("BEGIN RenderingServer::create_local_rendering_device()");
+
 	RenderingDevice *device = RenderingDevice::get_singleton();
 	if (!device) {
 		return nullptr;
 	}
+	
+	print_line("END RenderingServer::create_local_rendering_device()");
+
 	return device->create_local_device();
 }
 

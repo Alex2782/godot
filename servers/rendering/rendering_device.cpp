@@ -3143,18 +3143,29 @@ uint32_t RenderingDevice::_get_swap_chain_desired_count() const {
 }
 
 Error RenderingDevice::screen_create(DisplayServer::WindowID p_screen) {
+
+	print_line("BEGIN RenderingDevice::screen_create");
+
 	_THREAD_SAFE_METHOD_
 
 	RenderingContextDriver::SurfaceID surface = context->surface_get_from_window(p_screen);
 	ERR_FAIL_COND_V_MSG(surface == 0, ERR_CANT_CREATE, "A surface was not created for the screen.");
 
+	print_line("screen_swap_chains.find");
 	HashMap<DisplayServer::WindowID, RDD::SwapChainID>::ConstIterator it = screen_swap_chains.find(p_screen);
 	ERR_FAIL_COND_V_MSG(it != screen_swap_chains.end(), ERR_CANT_CREATE, "A swap chain was already created for the screen.");
 
+	print_line("driver->swap_chain_create");
 	RDD::SwapChainID swap_chain = driver->swap_chain_create(surface);
 	ERR_FAIL_COND_V_MSG(swap_chain.id == 0, ERR_CANT_CREATE, "Unable to create swap chain.");
 
+	print_line("driver->swap_chain_resize");
+	Error err = driver->swap_chain_resize(main_queue, swap_chain, _get_swap_chain_desired_count());
+	ERR_FAIL_COND_V_MSG(err != OK, ERR_CANT_CREATE, "Unable to resize the new swap chain.");
+
 	screen_swap_chains[p_screen] = swap_chain;
+
+	print_line("END RenderingDevice::screen_create");
 
 	return OK;
 }
@@ -5010,6 +5021,8 @@ void RenderingDevice::_flush_and_stall_for_all_frames() {
 Error RenderingDevice::initialize(RenderingContextDriver *p_context, DisplayServer::WindowID p_main_window) {
 	Error err;
 
+	print_line("BEGIN RenderingDevice::initialize");
+
 	RenderingContextDriver::SurfaceID main_surface = 0;
 	const bool main_instance = (singleton == this) && (p_main_window != DisplayServer::INVALID_WINDOW_ID);
 	if (p_main_window != DisplayServer::INVALID_WINDOW_ID) {
@@ -5022,6 +5035,7 @@ Error RenderingDevice::initialize(RenderingContextDriver *p_context, DisplayServ
 	driver = context->driver_create();
 
 	print_verbose("Devices:");
+	print_line("Devices:");
 	int32_t device_index = Engine::get_singleton()->get_gpu_index();
 	const uint32_t device_count = context->device_get_count();
 	const bool detect_device = (device_index < 0) || (device_index >= int32_t(device_count));
@@ -5033,6 +5047,7 @@ Error RenderingDevice::initialize(RenderingContextDriver *p_context, DisplayServ
 		String type = _get_device_type_name(device_option);
 		bool present_supported = main_surface != 0 ? context->device_supports_present(i, main_surface) : false;
 		print_verbose("  #" + itos(i) + ": " + vendor + " " + name + " - " + (present_supported ? "Supported" : "Unsupported") + ", " + type);
+		print_line("  #" + itos(i) + ": " + vendor + " " + name + " - " + (present_supported ? "Supported" : "Unsupported") + ", " + type);
 		if (detect_device && (present_supported || main_surface == 0)) {
 			// If a window was specified, present must be supported by the device to be available as an option.
 			// Assign a score for each type of device and prefer the device with the higher score.
@@ -5056,6 +5071,8 @@ Error RenderingDevice::initialize(RenderingContextDriver *p_context, DisplayServ
 	max_timestamp_query_elements = 256;
 
 	device = context->device_get(device_index);
+
+	print_line("driver->initialize: ", device_index, frame_count);
 	err = driver->initialize(device_index, frame_count);
 	ERR_FAIL_COND_V_MSG(err != OK, FAILED, "Failed to initialize driver for device.");
 
@@ -5106,6 +5123,7 @@ Error RenderingDevice::initialize(RenderingContextDriver *p_context, DisplayServ
 	}
 
 	// Create data for all the frames.
+	print_line("Create data for all the frames.");
 	for (uint32_t i = 0; i < frames.size(); i++) {
 		frames[i].index = 0;
 
@@ -5142,11 +5160,13 @@ Error RenderingDevice::initialize(RenderingContextDriver *p_context, DisplayServ
 	frames_drawn = frames.size();
 
 	// Initialize recording on the first frame.
+	print_line("Initialize recording on the first frame.");
 	driver->begin_segment(frame, frames_drawn++);
 	driver->command_buffer_begin(frames[0].setup_command_buffer);
 	driver->command_buffer_begin(frames[0].draw_command_buffer);
 
 	// Create draw graph and start it initialized as well.
+	print_line("Create draw graph and start it initialized as well.");
 	draw_graph.initialize(driver, device, frames.size(), main_queue_family, SECONDARY_COMMAND_BUFFERS_PER_FRAME);
 	draw_graph.begin();
 
@@ -5205,6 +5225,7 @@ Error RenderingDevice::initialize(RenderingContextDriver *p_context, DisplayServ
 		}
 	}
 
+	print_line("END RenderingDevice::initialize");
 	return OK;
 }
 
@@ -5543,8 +5564,13 @@ void RenderingDevice::finalize() {
 }
 
 RenderingDevice *RenderingDevice::create_local_device() {
+
+	print_line("BEGIN create_local_device");
 	RenderingDevice *rd = memnew(RenderingDevice);
 	rd->initialize(context);
+
+	print_line("END create_local_device");
+
 	return rd;
 }
 

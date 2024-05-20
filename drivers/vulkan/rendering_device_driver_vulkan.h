@@ -49,6 +49,17 @@
 #include <vulkan/vulkan.h>
 #endif
 
+#include <optional>
+struct QueueFamilyIndices {
+    std::optional<uint32_t> graphicsFamily;
+    std::optional<uint32_t> presentFamily;
+    
+    bool isComplete() {
+        return graphicsFamily.has_value() && presentFamily.has_value();
+    }
+};
+
+
 // Design principles:
 // - Vulkan structs are zero-initialized and fields not requiring a non-zero value are omitted (except in cases where expresivity reasons apply).
 class RenderingDeviceDriverVulkan : public RenderingDeviceDriver {
@@ -146,6 +157,8 @@ class RenderingDeviceDriverVulkan : public RenderingDeviceDriver {
 	bool _release_image_semaphore(CommandQueue *p_command_queue, uint32_t p_semaphore_index, bool p_release_on_swap_chain);
 	bool _recreate_image_semaphore(CommandQueue *p_command_queue, uint32_t p_semaphore_index, bool p_release_on_swap_chain);
 	void _set_object_name(VkObjectType p_object_type, uint64_t p_object_handle, String p_object_name);
+	
+	QueueFamilyIndices findQueueFamilies(VkPhysicalDevice device, VkSurfaceKHR surface);
 
 public:
 	Error initialize(uint32_t p_device_index, uint32_t p_frame_count) override final;

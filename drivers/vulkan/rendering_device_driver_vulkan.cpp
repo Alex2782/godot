@@ -450,6 +450,8 @@ Error RenderingDeviceDriverVulkan::_initialize_device_extensions() {
 	ERR_FAIL_COND_V(err != VK_SUCCESS, ERR_CANT_CREATE);
 	ERR_FAIL_COND_V_MSG(device_extension_count == 0, ERR_CANT_CREATE, "vkEnumerateDeviceExtensionProperties failed to find any extensions\n\nDo you have a compatible Vulkan installable client driver (ICD) installed?");
 
+	print_line("device_extension_count: ", device_extension_count);
+
 	TightLocalVector<VkExtensionProperties> device_extensions;
 	device_extensions.resize(device_extension_count);
 	err = vkEnumerateDeviceExtensionProperties(physical_device, nullptr, &device_extension_count, device_extensions.ptr());
@@ -504,7 +506,8 @@ Error RenderingDeviceDriverVulkan::_check_device_features() {
 		OS::get_singleton()->alert(error_string + "\nClick OK to exit.");
 #endif
 
-		return ERR_CANT_CREATE;
+		print_line(error_string);
+		//return ERR_CANT_CREATE;
 	}
 
 	// Opt-in to the features we actually need/use. These can be changed in the future.
@@ -966,16 +969,28 @@ Error RenderingDeviceDriverVulkan::_initialize_pipeline_cache() {
 }
 
 static void _convert_subpass_attachments(const VkAttachmentReference2 *p_attachment_references_2, uint32_t p_attachment_references_count, TightLocalVector<VkAttachmentReference> &r_attachment_references) {
+	
+	print_line("BEGIN _convert_subpass_attachments, p_attachment_references_count: ", p_attachment_references_count);
+	
+	print_line("r_attachment_references.resize");
 	r_attachment_references.resize(p_attachment_references_count);
 	for (uint32_t i = 0; i < p_attachment_references_count; i++) {
 		// Ignore sType, pNext and aspectMask (which is currently unused).
+		print_line("r_attachment_references[i].attachment = p_attachment_references_2[i].attachment;");
 		r_attachment_references[i].attachment = p_attachment_references_2[i].attachment;
+		print_line("r_attachment_references[i].layout = p_attachment_references_2[i].layout;");
 		r_attachment_references[i].layout = p_attachment_references_2[i].layout;
 	}
+
+	print_line("END _convert_subpass_attachments, p_attachment_references_count: ", p_attachment_references_count);
 }
 
 VkResult RenderingDeviceDriverVulkan::_create_render_pass(VkDevice p_device, const VkRenderPassCreateInfo2 *p_create_info, const VkAllocationCallbacks *p_allocator, VkRenderPass *p_render_pass) {
+	
+	print_line("BEGIN RenderingDeviceDriverVulkan::_create_render_pass");
+	
 	if (device_functions.CreateRenderPass2KHR != nullptr) {
+		print_line("END RenderingDeviceDriverVulkan::_create_render_pass, return CreateRenderPass2KHR");
 		return device_functions.CreateRenderPass2KHR(p_device, p_create_info, p_allocator, p_render_pass);
 	} else {
 		// Compatibility fallback with regular create render pass but by converting the inputs from the newer version to the older one.
@@ -1002,15 +1017,25 @@ VkResult RenderingDeviceDriverVulkan::_create_render_pass(VkDevice p_device, con
 		subpasses_attachments.resize(p_create_info->subpassCount * attachment_vectors_per_subpass);
 		subpasses.resize(p_create_info->subpassCount);
 
+		print_line("for p_create_info->subpassCount: ", p_create_info->subpassCount);
 		for (uint32_t i = 0; i < p_create_info->subpassCount; i++) {
 			const uint32_t vector_base_index = i * attachment_vectors_per_subpass;
+			print_line("vector_base_index: ", vector_base_index);
 			const uint32_t input_attachments_index = vector_base_index + 0;
 			const uint32_t color_attachments_index = vector_base_index + 1;
 			const uint32_t resolve_attachments_index = vector_base_index + 2;
 			const uint32_t depth_attachment_index = vector_base_index + 3;
+
+			print_line("_convert_subpass_attachments, input_attachments_index: ", input_attachments_index);
 			_convert_subpass_attachments(p_create_info->pSubpasses[i].pInputAttachments, p_create_info->pSubpasses[i].inputAttachmentCount, subpasses_attachments[input_attachments_index]);
+			
+			print_line("_convert_subpass_attachments, color_attachments_index: ", color_attachments_index);
 			_convert_subpass_attachments(p_create_info->pSubpasses[i].pColorAttachments, p_create_info->pSubpasses[i].colorAttachmentCount, subpasses_attachments[color_attachments_index]);
+			
+			print_line("_convert_subpass_attachments, resolve_attachments_index: ", resolve_attachments_index);
+			//_convert_subpass_attachments(p_create_info->pSubpasses[i].pResolveAttachments, p_create_info->pSubpasses[i].colorAttachmentCount, subpasses_attachments[resolve_attachments_index]);
 			_convert_subpass_attachments(p_create_info->pSubpasses[i].pResolveAttachments, (p_create_info->pSubpasses[i].pResolveAttachments != nullptr) ? p_create_info->pSubpasses[i].colorAttachmentCount : 0, subpasses_attachments[resolve_attachments_index]);
+			print_line("_convert_subpass_attachments, depth_attachment_index: ", depth_attachment_index);
 			_convert_subpass_attachments(p_create_info->pSubpasses[i].pDepthStencilAttachment, (p_create_info->pSubpasses[i].pDepthStencilAttachment != nullptr) ? 1 : 0, subpasses_attachments[depth_attachment_index]);
 
 			// Ignores sType and pNext from the subpass.
@@ -1031,6 +1056,7 @@ VkResult RenderingDeviceDriverVulkan::_create_render_pass(VkDevice p_device, con
 		TightLocalVector<VkSubpassDependency> dependencies;
 		dependencies.resize(p_create_info->dependencyCount);
 
+		print_line("for p_create_info->dependencyCount: ", p_create_info->dependencyCount);
 		for (uint32_t i = 0; i < p_create_info->dependencyCount; i++) {
 			// Ignores sType and pNext from the dependency, and viewMask which is currently unused.
 			const VkSubpassDependency2 &src_dependency = p_create_info->pDependencies[i];
@@ -1054,6 +1080,7 @@ VkResult RenderingDeviceDriverVulkan::_create_render_pass(VkDevice p_device, con
 		create_info.pSubpasses = subpasses.ptr();
 		create_info.dependencyCount = dependencies.size();
 		create_info.pDependencies = dependencies.ptr();
+		print_line("END RenderingDeviceDriverVulkan::_create_render_pass, return vkCreateRenderPass");
 		return vkCreateRenderPass(vk_device, &create_info, p_allocator, p_render_pass);
 	}
 }
@@ -1559,6 +1586,9 @@ RDD::TextureID RenderingDeviceDriverVulkan::texture_create_shared(TextureID p_or
 	image_view_create_info.components.a = (VkComponentSwizzle)p_view.swizzle_a;
 
 	if (enabled_device_extension_names.has(VK_KHR_MAINTENANCE_2_EXTENSION_NAME)) {
+
+		//print_line("VK_KHR_MAINTENANCE_2_EXTENSION_NAME");
+
 		// May need to make VK_KHR_maintenance2 mandatory and thus has Vulkan 1.1 be our minimum supported version
 		// if we require setting this information. Vulkan 1.0 may simply not care.
 		if (image_view_create_info.format != owner_tex_info->vk_view_create_info.format) {
@@ -1583,6 +1613,8 @@ RDD::TextureID RenderingDeviceDriverVulkan::texture_create_shared(TextureID p_or
 			image_view_create_info.pNext = usage_info;
 		}
 	}
+
+
 
 	VkImageView new_vk_image_view = VK_NULL_HANDLE;
 	VkResult err = vkCreateImageView(vk_device, &image_view_create_info, nullptr, &new_vk_image_view);
@@ -2451,6 +2483,9 @@ void RenderingDeviceDriverVulkan::_swap_chain_release(SwapChain *swap_chain) {
 }
 
 RenderingDeviceDriver::SwapChainID RenderingDeviceDriverVulkan::swap_chain_create(RenderingContextDriver::SurfaceID p_surface) {
+
+	print_line("BEGIN RenderingDeviceDriverVulkan::swap_chain_create");
+
 	DEV_ASSERT(p_surface != 0);
 
 	RenderingContextDriverVulkan::Surface *surface = (RenderingContextDriverVulkan::Surface *)(p_surface);
@@ -2458,11 +2493,14 @@ RenderingDeviceDriver::SwapChainID RenderingDeviceDriverVulkan::swap_chain_creat
 
 	// Retrieve the formats supported by the surface.
 	uint32_t format_count = 0;
+	print_line("GetPhysicalDeviceSurfaceFormatsKHR #1");
 	VkResult err = functions.GetPhysicalDeviceSurfaceFormatsKHR(physical_device, surface->vk_surface, &format_count, nullptr);
 	ERR_FAIL_COND_V(err != VK_SUCCESS, SwapChainID());
 
 	TightLocalVector<VkSurfaceFormatKHR> formats;
+	print_line("formats.resize(format_count), format_count: ", format_count);
 	formats.resize(format_count);
+	print_line("GetPhysicalDeviceSurfaceFormatsKHR #2");
 	err = functions.GetPhysicalDeviceSurfaceFormatsKHR(physical_device, surface->vk_surface, &format_count, formats.ptr());
 	ERR_FAIL_COND_V(err != VK_SUCCESS, SwapChainID());
 
@@ -2520,6 +2558,7 @@ RenderingDeviceDriver::SwapChainID RenderingDeviceDriverVulkan::swap_chain_creat
 	pass_info.pSubpasses = &subpass;
 
 	VkRenderPass render_pass = VK_NULL_HANDLE;
+	print_line("_create_render_pass");
 	err = _create_render_pass(vk_device, &pass_info, nullptr, &render_pass);
 	ERR_FAIL_COND_V(err != VK_SUCCESS, SwapChainID());
 
@@ -2528,10 +2567,16 @@ RenderingDeviceDriver::SwapChainID RenderingDeviceDriverVulkan::swap_chain_creat
 	swap_chain->format = format;
 	swap_chain->color_space = color_space;
 	swap_chain->render_pass = RenderPassID(render_pass);
+
+	print_line("END RenderingDeviceDriverVulkan::swap_chain_create -> return SwapChainID(swap_chain);");
+
 	return SwapChainID(swap_chain);
 }
 
 Error RenderingDeviceDriverVulkan::swap_chain_resize(CommandQueueID p_cmd_queue, SwapChainID p_swap_chain, uint32_t p_desired_framebuffer_count) {
+	
+	print_line("BEGIN RenderingDeviceDriverVulkan::swap_chain_resize");
+	
 	DEV_ASSERT(p_cmd_queue.id != 0);
 	DEV_ASSERT(p_swap_chain.id != 0);
 
@@ -2657,7 +2702,25 @@ Error RenderingDeviceDriverVulkan::swap_chain_resize(CommandQueueID p_cmd_queue,
 	swap_create_info.imageExtent = extent;
 	swap_create_info.imageArrayLayers = 1;
 	swap_create_info.imageUsage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
-	swap_create_info.imageSharingMode = VK_SHARING_MODE_EXCLUSIVE;
+	
+	//TODO Dev-TEST
+	QueueFamilyIndices indices = findQueueFamilies(physical_device, surface->vk_surface);
+	uint32_t queueFamilyIndices[] = {indices.graphicsFamily.value(), indices.presentFamily.value()};
+
+	//swap_create_info.imageSharingMode = VK_SHARING_MODE_EXCLUSIVE;
+	if (indices.graphicsFamily != indices.presentFamily) {
+		swap_create_info.imageSharingMode = VK_SHARING_MODE_CONCURRENT;
+		swap_create_info.queueFamilyIndexCount = 2;
+		swap_create_info.pQueueFamilyIndices = queueFamilyIndices;
+		print_line("VK_SHARING_MODE_CONCURRENT");
+	} else {
+		swap_create_info.imageSharingMode = VK_SHARING_MODE_EXCLUSIVE;
+		swap_create_info.queueFamilyIndexCount = 0; // Optional
+		swap_create_info.pQueueFamilyIndices = nullptr; // Optional
+		print_line("VK_SHARING_MODE_EXCLUSIVE");
+	}
+	
+
 	swap_create_info.preTransform = surface_transform_bits;
 	swap_create_info.compositeAlpha = composite_alpha;
 	swap_create_info.presentMode = present_mode;
@@ -2717,9 +2780,47 @@ Error RenderingDeviceDriverVulkan::swap_chain_resize(CommandQueueID p_cmd_queue,
 
 	// Once everything's been created correctly, indicate the surface no longer needs to be resized.
 	context_driver->surface_set_needs_resize(swap_chain->surface, false);
+	
+	print_line("END RenderingDeviceDriverVulkan::swap_chain_resize");
 
 	return OK;
 }
+
+
+QueueFamilyIndices RenderingDeviceDriverVulkan::findQueueFamilies(VkPhysicalDevice device, VkSurfaceKHR surface) {
+
+	QueueFamilyIndices indices;
+	
+	uint32_t queueFamilyCount = 0;
+	vkGetPhysicalDeviceQueueFamilyProperties(device, &queueFamilyCount, nullptr);
+	
+	std::vector<VkQueueFamilyProperties> queueFamilies(queueFamilyCount);
+	vkGetPhysicalDeviceQueueFamilyProperties(device, &queueFamilyCount, queueFamilies.data());
+	
+	int i = 0;
+	for(const auto& queueFammily : queueFamilies) {
+		if (queueFammily.queueFlags & VK_QUEUE_GRAPHICS_BIT) {
+			indices.graphicsFamily = i;
+		}
+		
+		VkBool32 presentSupport = false;
+		vkGetPhysicalDeviceSurfaceSupportKHR(device, i, surface, &presentSupport);
+		if (presentSupport) {
+			indices.presentFamily = i;
+		}
+		
+		print_line(i, ", count: ", queueFammily.queueCount, ", flags: ", queueFammily.queueFlags);
+		
+		if (indices.isComplete()) {
+			break;
+		}
+		
+		i++;
+	}
+	
+	return indices;
+}
+
 
 RDD::FramebufferID RenderingDeviceDriverVulkan::swap_chain_acquire_framebuffer(CommandQueueID p_cmd_queue, SwapChainID p_swap_chain, bool &r_resize_required) {
 	DEV_ASSERT(p_cmd_queue);
@@ -4146,6 +4247,9 @@ void RenderingDeviceDriverVulkan::command_bind_render_pipeline(CommandBufferID p
 void RenderingDeviceDriverVulkan::command_bind_render_uniform_set(CommandBufferID p_cmd_buffer, UniformSetID p_uniform_set, ShaderID p_shader, uint32_t p_set_index) {
 	const ShaderInfo *shader_info = (const ShaderInfo *)p_shader.id;
 	const UniformSetInfo *usi = (const UniformSetInfo *)p_uniform_set.id;
+
+	//print_line("RenderingDeviceDriverVulkan::command_bind_render_uniform_set -> vkCmdBindDescriptorSets: p_set_index: ", p_set_index);
+
 	vkCmdBindDescriptorSets((VkCommandBuffer)p_cmd_buffer.id, VK_PIPELINE_BIND_POINT_GRAPHICS, shader_info->vk_pipeline_layout, p_set_index, 1, &usi->vk_descriptor_set, 0, nullptr);
 }
 
@@ -4154,6 +4258,7 @@ void RenderingDeviceDriverVulkan::command_render_draw(CommandBufferID p_cmd_buff
 }
 
 void RenderingDeviceDriverVulkan::command_render_draw_indexed(CommandBufferID p_cmd_buffer, uint32_t p_index_count, uint32_t p_instance_count, uint32_t p_first_index, int32_t p_vertex_offset, uint32_t p_first_instance) {
+	//print_line("RenderingDeviceDriverVulkan::command_render_draw_indexed -> vkCmdDrawIndexed:", p_index_count, p_instance_count, p_first_index, p_vertex_offset, p_first_instance);
 	vkCmdDrawIndexed((VkCommandBuffer)p_cmd_buffer.id, p_index_count, p_instance_count, p_first_index, p_vertex_offset, p_first_instance);
 }
 
@@ -4559,6 +4664,9 @@ void RenderingDeviceDriverVulkan::command_bind_compute_pipeline(CommandBufferID 
 void RenderingDeviceDriverVulkan::command_bind_compute_uniform_set(CommandBufferID p_cmd_buffer, UniformSetID p_uniform_set, ShaderID p_shader, uint32_t p_set_index) {
 	const ShaderInfo *shader_info = (const ShaderInfo *)p_shader.id;
 	const UniformSetInfo *usi = (const UniformSetInfo *)p_uniform_set.id;
+
+	print_line("RenderingDeviceDriverVulkan::command_bind_compute_uniform_set: p_set_index: ", p_set_index);
+
 	vkCmdBindDescriptorSets((VkCommandBuffer)p_cmd_buffer.id, VK_PIPELINE_BIND_POINT_COMPUTE, shader_info->vk_pipeline_layout, p_set_index, 1, &usi->vk_descriptor_set, 0, nullptr);
 }
 

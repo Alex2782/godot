@@ -2512,6 +2512,9 @@ Error _parse_resource_dummy(void *p_data, VariantParser::Stream *p_stream, Ref<R
 }
 
 Error Main::setup2() {
+
+	print_line("BEGIN Main::setup2");
+
 	Thread::make_main_thread(); // Make whatever thread call this the main thread.
 	set_current_thread_safe_for_nodes(true);
 
@@ -2689,6 +2692,9 @@ Error Main::setup2() {
 		// rendering_driver now held in static global String in main and initialized in setup()
 		Error err;
 		display_server = DisplayServer::create(display_driver_idx, rendering_driver, window_mode, window_vsync_mode, window_flags, window_position, window_size, init_screen, err);
+		
+		print_line("display_server, err: ", err);
+		
 		if (err != OK || display_server == nullptr) {
 			// We can't use this display server, try other ones as fallback.
 			// Skip headless (always last registered) because that's not what users
@@ -2772,6 +2778,7 @@ Error Main::setup2() {
 	}
 
 	/* Initialize Rendering Server */
+	print_line("BEGIN Initialize Rendering Server");
 
 	{
 		OS::get_singleton()->benchmark_begin_measure("Servers", "Rendering");
@@ -2796,6 +2803,7 @@ Error Main::setup2() {
 
 		OS::get_singleton()->benchmark_end_measure("Servers", "Rendering");
 	}
+	print_line("END Initialize Rendering Server");
 
 #ifdef UNIX_ENABLED
 	// Print warning after initializing the renderer but before initializing audio.
@@ -2866,6 +2874,8 @@ Error Main::setup2() {
 		Color clear = GLOBAL_DEF_BASIC("rendering/environment/defaults/default_clear_color", Color(0.3, 0.3, 0.3));
 		RenderingServer::get_singleton()->set_default_clear_color(clear);
 
+		print_line("show_logo: ", show_logo);
+
 		if (show_logo) { //boot logo!
 			const bool boot_logo_image = GLOBAL_DEF_BASIC("application/boot_splash/show_image", true);
 			const String boot_logo_path = String(GLOBAL_DEF_BASIC(PropertyInfo(Variant::STRING, "application/boot_splash/image", PROPERTY_HINT_FILE, "*.png"), String())).strip_edges();
@@ -2873,6 +2883,8 @@ Error Main::setup2() {
 			const bool boot_logo_filter = GLOBAL_DEF_BASIC("application/boot_splash/use_filter", true);
 
 			Ref<Image> boot_logo;
+
+			print_line("boot_logo_image: ", boot_logo_image);
 
 			if (boot_logo_image) {
 				if (!boot_logo_path.is_empty()) {
@@ -3160,6 +3172,8 @@ Error Main::setup2() {
 	MAIN_PRINT("Main: Done");
 
 	OS::get_singleton()->benchmark_end_measure("Startup", "Setup");
+	
+	print_line("END Main::setup2");
 
 	return OK;
 }
@@ -3297,6 +3311,9 @@ int Main::start() {
 	}
 
 	uint64_t minimum_time_msec = GLOBAL_DEF(PropertyInfo(Variant::INT, "application/boot_splash/minimum_display_time", PROPERTY_HINT_RANGE, "0,100,1,or_greater,suffix:ms"), 0);
+	
+	print_line("minimum_time_msec: ", minimum_time_msec);
+	
 	if (Engine::get_singleton()->is_editor_hint()) {
 		minimum_time_msec = 0;
 	}
@@ -3894,6 +3911,8 @@ int Main::start() {
 	if (movie_writer) {
 		movie_writer->begin(DisplayServer::get_singleton()->window_get_size(), fixed_fps, Engine::get_singleton()->get_write_movie_path());
 	}
+
+	print_line("minimum_time_msec: ", minimum_time_msec);
 
 	if (minimum_time_msec) {
 		uint64_t minimum_time = 1000 * minimum_time_msec;
