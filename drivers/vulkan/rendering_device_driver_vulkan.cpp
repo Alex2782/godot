@@ -2702,25 +2702,7 @@ Error RenderingDeviceDriverVulkan::swap_chain_resize(CommandQueueID p_cmd_queue,
 	swap_create_info.imageExtent = extent;
 	swap_create_info.imageArrayLayers = 1;
 	swap_create_info.imageUsage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
-	
-	//TODO Dev-TEST
-	QueueFamilyIndices indices = findQueueFamilies(physical_device, surface->vk_surface);
-	uint32_t queueFamilyIndices[] = {indices.graphicsFamily.value(), indices.presentFamily.value()};
-
-	//swap_create_info.imageSharingMode = VK_SHARING_MODE_EXCLUSIVE;
-	if (indices.graphicsFamily != indices.presentFamily) {
-		swap_create_info.imageSharingMode = VK_SHARING_MODE_CONCURRENT;
-		swap_create_info.queueFamilyIndexCount = 2;
-		swap_create_info.pQueueFamilyIndices = queueFamilyIndices;
-		print_line("VK_SHARING_MODE_CONCURRENT");
-	} else {
-		swap_create_info.imageSharingMode = VK_SHARING_MODE_EXCLUSIVE;
-		swap_create_info.queueFamilyIndexCount = 0; // Optional
-		swap_create_info.pQueueFamilyIndices = nullptr; // Optional
-		print_line("VK_SHARING_MODE_EXCLUSIVE");
-	}
-	
-
+	swap_create_info.imageSharingMode = VK_SHARING_MODE_EXCLUSIVE;
 	swap_create_info.preTransform = surface_transform_bits;
 	swap_create_info.compositeAlpha = composite_alpha;
 	swap_create_info.presentMode = present_mode;
@@ -2785,42 +2767,6 @@ Error RenderingDeviceDriverVulkan::swap_chain_resize(CommandQueueID p_cmd_queue,
 
 	return OK;
 }
-
-
-QueueFamilyIndices RenderingDeviceDriverVulkan::findQueueFamilies(VkPhysicalDevice device, VkSurfaceKHR surface) {
-
-	QueueFamilyIndices indices;
-	
-	uint32_t queueFamilyCount = 0;
-	vkGetPhysicalDeviceQueueFamilyProperties(device, &queueFamilyCount, nullptr);
-	
-	std::vector<VkQueueFamilyProperties> queueFamilies(queueFamilyCount);
-	vkGetPhysicalDeviceQueueFamilyProperties(device, &queueFamilyCount, queueFamilies.data());
-	
-	int i = 0;
-	for(const auto& queueFammily : queueFamilies) {
-		if (queueFammily.queueFlags & VK_QUEUE_GRAPHICS_BIT) {
-			indices.graphicsFamily = i;
-		}
-		
-		VkBool32 presentSupport = false;
-		vkGetPhysicalDeviceSurfaceSupportKHR(device, i, surface, &presentSupport);
-		if (presentSupport) {
-			indices.presentFamily = i;
-		}
-		
-		print_line(i, ", count: ", queueFammily.queueCount, ", flags: ", queueFammily.queueFlags);
-		
-		if (indices.isComplete()) {
-			break;
-		}
-		
-		i++;
-	}
-	
-	return indices;
-}
-
 
 RDD::FramebufferID RenderingDeviceDriverVulkan::swap_chain_acquire_framebuffer(CommandQueueID p_cmd_queue, SwapChainID p_swap_chain, bool &r_resize_required) {
 	DEV_ASSERT(p_cmd_queue);
@@ -3552,6 +3498,9 @@ void RenderingDeviceDriverVulkan::_descriptor_set_pool_unreference(DescriptorSet
 }
 
 RDD::UniformSetID RenderingDeviceDriverVulkan::uniform_set_create(VectorView<BoundUniform> p_uniforms, ShaderID p_shader, uint32_t p_set_index) {
+	
+	print_line("RenderingDeviceDriverVulkan::uniform_set_create: p_shader: ", itos(p_shader.id), ", p_set_index: ", p_set_index);
+	
 	DescriptorSetPoolKey pool_key;
 
 	VkWriteDescriptorSet *vk_writes = ALLOCA_ARRAY(VkWriteDescriptorSet, p_uniforms.size());
@@ -3816,6 +3765,7 @@ void RenderingDeviceDriverVulkan::command_clear_buffer(CommandBufferID p_cmd_buf
 void RenderingDeviceDriverVulkan::command_copy_buffer(CommandBufferID p_cmd_buffer, BufferID p_src_buffer, BufferID p_dst_buffer, VectorView<BufferCopyRegion> p_regions) {
 	const BufferInfo *src_buf_info = (const BufferInfo *)p_src_buffer.id;
 	const BufferInfo *dst_buf_info = (const BufferInfo *)p_dst_buffer.id;
+	print_line("\t\t RenderingDeviceDriverVulkan::command_copy_buffer: src.id: ", itos(p_src_buffer.id), ", dst.id: ", itos(p_dst_buffer.id), ", regions.size: ", p_regions.size());
 	vkCmdCopyBuffer((VkCommandBuffer)p_cmd_buffer.id, src_buf_info->vk_buffer, dst_buf_info->vk_buffer, p_regions.size(), (const VkBufferCopy *)p_regions.ptr());
 }
 
@@ -3895,6 +3845,7 @@ void RenderingDeviceDriverVulkan::pipeline_free(PipelineID p_pipeline) {
 
 void RenderingDeviceDriverVulkan::command_bind_push_constants(CommandBufferID p_cmd_buffer, ShaderID p_shader, uint32_t p_dst_first_index, VectorView<uint32_t> p_data) {
 	const ShaderInfo *shader_info = (const ShaderInfo *)p_shader.id;
+	print_line("\t\t vkCmdPushConstants: vk_push_constant_stages: ", itos(shader_info->vk_push_constant_stages), ", offset: ", itos(p_dst_first_index * sizeof(uint32_t)), ", size: ", itos(p_data.size() * sizeof(uint32_t)));
 	vkCmdPushConstants((VkCommandBuffer)p_cmd_buffer.id, shader_info->vk_pipeline_layout, shader_info->vk_push_constant_stages, p_dst_first_index * sizeof(uint32_t), p_data.size() * sizeof(uint32_t), p_data.ptr());
 }
 
@@ -4249,7 +4200,6 @@ void RenderingDeviceDriverVulkan::command_bind_render_uniform_set(CommandBufferI
 	const UniformSetInfo *usi = (const UniformSetInfo *)p_uniform_set.id;
 
 	//print_line("RenderingDeviceDriverVulkan::command_bind_render_uniform_set -> vkCmdBindDescriptorSets: p_set_index: ", p_set_index);
-
 	vkCmdBindDescriptorSets((VkCommandBuffer)p_cmd_buffer.id, VK_PIPELINE_BIND_POINT_GRAPHICS, shader_info->vk_pipeline_layout, p_set_index, 1, &usi->vk_descriptor_set, 0, nullptr);
 }
 

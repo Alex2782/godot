@@ -449,6 +449,8 @@ static String _get_global_shader_uniform_from_type_and_index(const String &p_buf
 String ShaderCompiler::_dump_node_code(const SL::Node *p_node, int p_level, GeneratedCode &r_gen_code, IdentifierActions &p_actions, const DefaultIdentifierActions &p_default_actions, bool p_assigning, bool p_use_scope) {
 	String code;
 
+	//print_line("ShaderCompiler::_dump_node_code: p_level: ", p_level, ", uniforms->size: ", p_actions.uniforms->size());
+
 	switch (p_node->type) {
 		case SL::Node::NODE_TYPE_SHADER: {
 			SL::ShaderNode *pnode = (SL::ShaderNode *)p_node;
@@ -539,16 +541,21 @@ String ShaderCompiler::_dump_node_code(const SL::Node *p_node, int p_level, Gene
 				uniform_names.push_back(E.key);
 			}
 
+			print_line("\t uniform_names: ", uniform_names, ", pnode->uniforms.size: ", pnode->uniforms.size());
+
 			uniform_names.sort_custom<StringName::AlphCompare>(); //ensure order is deterministic so the same shader is always produced
 
 			for (int k = 0; k < uniform_names.size(); k++) {
 				const StringName &uniform_name = uniform_names[k];
 				const SL::ShaderNode::Uniform &uniform = pnode->uniforms[uniform_name];
 
+				print_line("\t uniform, type:", uniform.type);
+
 				String ucode;
 
 				if (uniform.scope == SL::ShaderNode::Uniform::SCOPE_INSTANCE) {
 					//insert, but don't generate any code.
+					print_line("\t SCOPE_INSTANCE, uniforms->insert: name: ", uniform_name, ", type:", uniform.type);
 					p_actions.uniforms->insert(uniform_name, uniform);
 					continue; // Instances are indexed directly, don't need index uniforms.
 				}
@@ -629,6 +636,7 @@ String ShaderCompiler::_dump_node_code(const SL::Node *p_node, int p_level, Gene
 					}
 				}
 
+				print_line("\t ELSE, uniforms->insert: name: ", uniform_name, ", type:", uniform.type);
 				p_actions.uniforms->insert(uniform_name, uniform);
 			}
 
@@ -1456,6 +1464,9 @@ ShaderLanguage::DataType ShaderCompiler::_get_global_shader_uniform_type(const S
 }
 
 Error ShaderCompiler::compile(RS::ShaderMode p_mode, const String &p_code, IdentifierActions *p_actions, const String &p_path, GeneratedCode &r_gen_code) {
+	
+	print_line("ShaderCompiler::compile, p_mode: ", itos(p_mode), ", uniforms->size: ", p_actions->uniforms->size());
+	
 	SL::ShaderCompileInfo info;
 	info.functions = ShaderTypes::get_singleton()->get_functions(p_mode);
 	info.render_modes = ShaderTypes::get_singleton()->get_modes(p_mode);

@@ -29,6 +29,7 @@
 /**************************************************************************/
 
 #include "rendering_device_graph.h"
+#include "drivers/vulkan/rendering_device_driver_vulkan.h"
 
 #define PRINT_RENDER_GRAPH 0
 #define FORCE_FULL_ACCESS_BITS 0
@@ -201,6 +202,9 @@ RenderingDeviceGraph::ComputeListInstruction *RenderingDeviceGraph::_allocate_co
 }
 
 void RenderingDeviceGraph::_add_command_to_graph(ResourceTracker **p_resource_trackers, ResourceUsage *p_resource_usages, uint32_t p_resource_count, int32_t p_command_index, RecordedCommand *r_command) {
+	
+	print_line("RenderingDeviceGraph::_add_command_to_graph: p_command_index: ", p_command_index, ", r_command->type: ", r_command->type);
+	
 	// Assign the next stages derived from the stages the command requires first.
 	r_command->next_stages = r_command->self_stages;
 
@@ -642,6 +646,11 @@ void RenderingDeviceGraph::_run_compute_list_command(RDD::CommandBufferID p_comm
 
 void RenderingDeviceGraph::_run_draw_list_command(RDD::CommandBufferID p_command_buffer, const uint8_t *p_instruction_data, uint32_t p_instruction_data_size) {
 	uint32_t instruction_data_cursor = 0;
+
+	print_line("=================================================================================================================");
+	print_line("RenderingDeviceGraph::_run_draw_list_command, p_instruction_data_size: ", p_instruction_data_size, "p_command_buffer.id: ", itos(p_command_buffer.id));
+	print_line("=================================================================================================================");
+
 	while (instruction_data_cursor < p_instruction_data_size) {
 		DEV_ASSERT((instruction_data_cursor + sizeof(DrawListInstruction)) <= p_instruction_data_size);
 
@@ -649,21 +658,33 @@ void RenderingDeviceGraph::_run_draw_list_command(RDD::CommandBufferID p_command
 		switch (instruction->type) {
 			case DrawListInstruction::TYPE_BIND_INDEX_BUFFER: {
 				const DrawListBindIndexBufferInstruction *bind_index_buffer_instruction = reinterpret_cast<const DrawListBindIndexBufferInstruction *>(instruction);
+				
+				print_line("\t TYPE_BIND_INDEX_BUFFER: buffer.id: ", itos(bind_index_buffer_instruction->buffer.id), ", format: ", bind_index_buffer_instruction->format, ", offset: ", bind_index_buffer_instruction->offset);
 				driver->command_render_bind_index_buffer(p_command_buffer, bind_index_buffer_instruction->buffer, bind_index_buffer_instruction->format, bind_index_buffer_instruction->offset);
 				instruction_data_cursor += sizeof(DrawListBindIndexBufferInstruction);
 			} break;
 			case DrawListInstruction::TYPE_BIND_PIPELINE: {
 				const DrawListBindPipelineInstruction *bind_pipeline_instruction = reinterpret_cast<const DrawListBindPipelineInstruction *>(instruction);
+				
+				print_line("\t TYPE_BIND_PIPELINE: pipeline.id: ", itos(bind_pipeline_instruction->pipeline.id));
 				driver->command_bind_render_pipeline(p_command_buffer, bind_pipeline_instruction->pipeline);
 				instruction_data_cursor += sizeof(DrawListBindPipelineInstruction);
 			} break;
 			case DrawListInstruction::TYPE_BIND_UNIFORM_SET: {
 				const DrawListBindUniformSetInstruction *bind_uniform_set_instruction = reinterpret_cast<const DrawListBindUniformSetInstruction *>(instruction);
+				
+				print_line("\t TYPE_BIND_UNIFORM_SET: uniform_set.id: ", itos(bind_uniform_set_instruction->uniform_set.id), 
+				", shader.id: ", itos(bind_uniform_set_instruction->shader.id), 
+				", uniform_set.id: ", itos(bind_uniform_set_instruction->uniform_set.id), 
+				", set_index: ",bind_uniform_set_instruction->set_index);
+
 				driver->command_bind_render_uniform_set(p_command_buffer, bind_uniform_set_instruction->uniform_set, bind_uniform_set_instruction->shader, bind_uniform_set_instruction->set_index);
 				instruction_data_cursor += sizeof(DrawListBindUniformSetInstruction);
 			} break;
 			case DrawListInstruction::TYPE_BIND_VERTEX_BUFFERS: {
 				const DrawListBindVertexBuffersInstruction *bind_vertex_buffers_instruction = reinterpret_cast<const DrawListBindVertexBuffersInstruction *>(instruction);
+				
+				print_line("\t TYPE_BIND_VERTEX_BUFFERS: vertex_buffers_count: ", bind_vertex_buffers_instruction->vertex_buffers_count, ", vertex_buffers()->id: ", itos(bind_vertex_buffers_instruction->vertex_buffers()->id), ", vertex_buffer_offsets: ", *bind_vertex_buffers_instruction->vertex_buffer_offsets());
 				driver->command_render_bind_vertex_buffers(p_command_buffer, bind_vertex_buffers_instruction->vertex_buffers_count, bind_vertex_buffers_instruction->vertex_buffers(), bind_vertex_buffers_instruction->vertex_buffer_offsets());
 				instruction_data_cursor += sizeof(DrawListBindVertexBuffersInstruction);
 				instruction_data_cursor += sizeof(RDD::BufferID) * bind_vertex_buffers_instruction->vertex_buffers_count;
@@ -673,6 +694,8 @@ void RenderingDeviceGraph::_run_draw_list_command(RDD::CommandBufferID p_command
 				const DrawListClearAttachmentsInstruction *clear_attachments_instruction = reinterpret_cast<const DrawListClearAttachmentsInstruction *>(instruction);
 				const VectorView attachments_clear_view(clear_attachments_instruction->attachments_clear(), clear_attachments_instruction->attachments_clear_count);
 				const VectorView attachments_clear_rect_view(clear_attachments_instruction->attachments_clear_rect(), clear_attachments_instruction->attachments_clear_rect_count);
+				
+				print_line("\t TYPE_CLEAR_ATTACHMENTS: ");
 				driver->command_render_clear_attachments(p_command_buffer, attachments_clear_view, attachments_clear_rect_view);
 				instruction_data_cursor += sizeof(DrawListClearAttachmentsInstruction);
 				instruction_data_cursor += sizeof(RDD::AttachmentClear) * clear_attachments_instruction->attachments_clear_count;
@@ -680,53 +703,77 @@ void RenderingDeviceGraph::_run_draw_list_command(RDD::CommandBufferID p_command
 			} break;
 			case DrawListInstruction::TYPE_DRAW: {
 				const DrawListDrawInstruction *draw_instruction = reinterpret_cast<const DrawListDrawInstruction *>(instruction);
+				
+				print_line("\t TYPE_DRAW: vertex_count: ", draw_instruction->vertex_count, ", instance_count: ", draw_instruction->instance_count);
 				driver->command_render_draw(p_command_buffer, draw_instruction->vertex_count, draw_instruction->instance_count, 0, 0);
 				instruction_data_cursor += sizeof(DrawListDrawInstruction);
 			} break;
 			case DrawListInstruction::TYPE_DRAW_INDEXED: {
 				const DrawListDrawIndexedInstruction *draw_indexed_instruction = reinterpret_cast<const DrawListDrawIndexedInstruction *>(instruction);
+				
+				print_line("\t TYPE_DRAW_INDEXED: index_count: ", draw_indexed_instruction->index_count, ", instance_count: ", draw_indexed_instruction->instance_count, ", first_index: ", draw_indexed_instruction->first_index);
 				driver->command_render_draw_indexed(p_command_buffer, draw_indexed_instruction->index_count, draw_indexed_instruction->instance_count, draw_indexed_instruction->first_index, 0, 0);
 				instruction_data_cursor += sizeof(DrawListDrawIndexedInstruction);
+
+				//uniform_set_instructions.clear();
+
+				print_line("\t ----------------- ");
 			} break;
 			case DrawListInstruction::TYPE_EXECUTE_COMMANDS: {
 				const DrawListExecuteCommandsInstruction *execute_commands_instruction = reinterpret_cast<const DrawListExecuteCommandsInstruction *>(instruction);
+				
+				print_line("\t TYPE_EXECUTE_COMMANDS: command_buffer.id: ", itos(execute_commands_instruction->command_buffer.id));
 				driver->command_buffer_execute_secondary(p_command_buffer, execute_commands_instruction->command_buffer);
 				instruction_data_cursor += sizeof(DrawListExecuteCommandsInstruction);
 			} break;
 			case DrawListInstruction::TYPE_NEXT_SUBPASS: {
 				const DrawListNextSubpassInstruction *next_subpass_instruction = reinterpret_cast<const DrawListNextSubpassInstruction *>(instruction);
+				
+				print_line("\t TYPE_NEXT_SUBPASS: command_buffer_type: ", next_subpass_instruction->command_buffer_type);
 				driver->command_next_render_subpass(p_command_buffer, next_subpass_instruction->command_buffer_type);
 				instruction_data_cursor += sizeof(DrawListNextSubpassInstruction);
 			} break;
 			case DrawListInstruction::TYPE_SET_BLEND_CONSTANTS: {
 				const DrawListSetBlendConstantsInstruction *set_blend_constants_instruction = reinterpret_cast<const DrawListSetBlendConstantsInstruction *>(instruction);
+				
+				print_line("\t TYPE_SET_BLEND_CONSTANTS: color: ", set_blend_constants_instruction->color);
 				driver->command_render_set_blend_constants(p_command_buffer, set_blend_constants_instruction->color);
 				instruction_data_cursor += sizeof(DrawListSetBlendConstantsInstruction);
 			} break;
 			case DrawListInstruction::TYPE_SET_LINE_WIDTH: {
 				const DrawListSetLineWidthInstruction *set_line_width_instruction = reinterpret_cast<const DrawListSetLineWidthInstruction *>(instruction);
+				
+				print_line("\t TYPE_SET_LINE_WIDTH: ", set_line_width_instruction->width);
 				driver->command_render_set_line_width(p_command_buffer, set_line_width_instruction->width);
 				instruction_data_cursor += sizeof(DrawListSetLineWidthInstruction);
 			} break;
 			case DrawListInstruction::TYPE_SET_PUSH_CONSTANT: {
 				const DrawListSetPushConstantInstruction *set_push_constant_instruction = reinterpret_cast<const DrawListSetPushConstantInstruction *>(instruction);
 				const VectorView push_constant_data_view(reinterpret_cast<const uint32_t *>(set_push_constant_instruction->data()), set_push_constant_instruction->size / sizeof(uint32_t));
+				
+				print_line("\t TYPE_SET_PUSH_CONSTANT: shader.id: ", itos(set_push_constant_instruction->shader.id), ", data_view.ptr(): ", *push_constant_data_view.ptr());
 				driver->command_bind_push_constants(p_command_buffer, set_push_constant_instruction->shader, 0, push_constant_data_view);
 				instruction_data_cursor += sizeof(DrawListSetPushConstantInstruction);
 				instruction_data_cursor += set_push_constant_instruction->size;
 			} break;
 			case DrawListInstruction::TYPE_SET_SCISSOR: {
 				const DrawListSetScissorInstruction *set_scissor_instruction = reinterpret_cast<const DrawListSetScissorInstruction *>(instruction);
+				
+				print_line("\t TYPE_SET_SCISSOR: rect: ", set_scissor_instruction->rect);
 				driver->command_render_set_scissor(p_command_buffer, set_scissor_instruction->rect);
 				instruction_data_cursor += sizeof(DrawListSetScissorInstruction);
 			} break;
 			case DrawListInstruction::TYPE_SET_VIEWPORT: {
 				const DrawListSetViewportInstruction *set_viewport_instruction = reinterpret_cast<const DrawListSetViewportInstruction *>(instruction);
+				
+				print_line("\t TYPE_SET_VIEWPORT: rect: ", set_viewport_instruction->rect);
 				driver->command_render_set_viewport(p_command_buffer, set_viewport_instruction->rect);
 				instruction_data_cursor += sizeof(DrawListSetViewportInstruction);
 			} break;
 			case DrawListInstruction::TYPE_UNIFORM_SET_PREPARE_FOR_USE: {
 				const DrawListUniformSetPrepareForUseInstruction *uniform_set_prepare_for_use_instruction = reinterpret_cast<const DrawListUniformSetPrepareForUseInstruction *>(instruction);
+				
+				print_line("\t TYPE_UNIFORM_SET_PREPARE_FOR_USE: ");
 				driver->command_uniform_set_prepare_for_use(p_command_buffer, uniform_set_prepare_for_use_instruction->uniform_set, uniform_set_prepare_for_use_instruction->shader, uniform_set_prepare_for_use_instruction->set_index);
 				instruction_data_cursor += sizeof(DrawListUniformSetPrepareForUseInstruction);
 			} break;
@@ -738,6 +785,7 @@ void RenderingDeviceGraph::_run_draw_list_command(RDD::CommandBufferID p_command
 }
 
 void RenderingDeviceGraph::_run_secondary_command_buffer_task(const SecondaryCommandBuffer *p_secondary) {
+	print_line("void RenderingDeviceGraph::_run_secondary_command_buffer_task");
 	driver->command_buffer_begin_secondary(p_secondary->command_buffer, p_secondary->render_pass, 0, p_secondary->framebuffer);
 	_run_draw_list_command(p_secondary->command_buffer, p_secondary->instruction_data.ptr(), p_secondary->instruction_data.size());
 	driver->command_buffer_end(p_secondary->command_buffer);
@@ -754,6 +802,9 @@ void RenderingDeviceGraph::_wait_for_secondary_command_buffer_tasks() {
 }
 
 void RenderingDeviceGraph::_run_render_commands(int32_t p_level, const RecordedCommandSort *p_sorted_commands, uint32_t p_sorted_commands_count, RDD::CommandBufferID &r_command_buffer, CommandBufferPool &r_command_buffer_pool, int32_t &r_current_label_index, int32_t &r_current_label_level) {
+	
+	print_line("RenderingDeviceGraph::_run_render_commands: p_level: ", p_level, ", p_sorted_commands_count: ", p_sorted_commands_count);
+	
 	for (uint32_t i = 0; i < p_sorted_commands_count; i++) {
 		const uint32_t command_index = p_sorted_commands[i].index;
 		const uint32_t command_data_offset = command_data_offsets[command_index];
@@ -762,18 +813,22 @@ void RenderingDeviceGraph::_run_render_commands(int32_t p_level, const RecordedC
 
 		switch (command->type) {
 			case RecordedCommand::TYPE_BUFFER_CLEAR: {
+				print_line("\t RecordedCommand::TYPE_BUFFER_CLEAR:");
 				const RecordedBufferClearCommand *buffer_clear_command = reinterpret_cast<const RecordedBufferClearCommand *>(command);
 				driver->command_clear_buffer(r_command_buffer, buffer_clear_command->buffer, buffer_clear_command->offset, buffer_clear_command->size);
 			} break;
 			case RecordedCommand::TYPE_BUFFER_COPY: {
+				print_line("\t RecordedCommand::TYPE_BUFFER_COPY");
 				const RecordedBufferCopyCommand *buffer_copy_command = reinterpret_cast<const RecordedBufferCopyCommand *>(command);
 				driver->command_copy_buffer(r_command_buffer, buffer_copy_command->source, buffer_copy_command->destination, buffer_copy_command->region);
 			} break;
 			case RecordedCommand::TYPE_BUFFER_GET_DATA: {
+				print_line("\t RecordedCommand::TYPE_BUFFER_GET_DATA");
 				const RecordedBufferGetDataCommand *buffer_get_data_command = reinterpret_cast<const RecordedBufferGetDataCommand *>(command);
 				driver->command_copy_buffer(r_command_buffer, buffer_get_data_command->source, buffer_get_data_command->destination, buffer_get_data_command->region);
 			} break;
 			case RecordedCommand::TYPE_BUFFER_UPDATE: {
+				print_line("\t RecordedCommand::TYPE_BUFFER_UPDATE");
 				const RecordedBufferUpdateCommand *buffer_update_command = reinterpret_cast<const RecordedBufferUpdateCommand *>(command);
 				const RecordedBufferCopy *command_buffer_copies = buffer_update_command->buffer_copies();
 				for (uint32_t j = 0; j < buffer_update_command->buffer_copies_count; j++) {
@@ -781,6 +836,7 @@ void RenderingDeviceGraph::_run_render_commands(int32_t p_level, const RecordedC
 				}
 			} break;
 			case RecordedCommand::TYPE_COMPUTE_LIST: {
+				print_line("\t RecordedCommand::TYPE_COMPUTE_LIST");
 				if (device.workarounds.avoid_compute_after_draw && workarounds_state.draw_list_found) {
 					// Avoid compute after draw workaround. Refer to the comment that enables this in the Vulkan driver for more information.
 					workarounds_state.draw_list_found = false;
@@ -805,6 +861,7 @@ void RenderingDeviceGraph::_run_render_commands(int32_t p_level, const RecordedC
 				_run_compute_list_command(r_command_buffer, compute_list_command->instruction_data(), compute_list_command->instruction_data_size);
 			} break;
 			case RecordedCommand::TYPE_DRAW_LIST: {
+				print_line("\t RecordedCommand::TYPE_DRAW_LIST");
 				if (device.workarounds.avoid_compute_after_draw) {
 					// Indicate that a draw list was encountered for the workaround.
 					workarounds_state.draw_list_found = true;
@@ -817,23 +874,28 @@ void RenderingDeviceGraph::_run_render_commands(int32_t p_level, const RecordedC
 				driver->command_end_render_pass(r_command_buffer);
 			} break;
 			case RecordedCommand::TYPE_TEXTURE_CLEAR: {
+				print_line("\t RecordedCommand::TYPE_TEXTURE_CLEAR");
 				const RecordedTextureClearCommand *texture_clear_command = reinterpret_cast<const RecordedTextureClearCommand *>(command);
 				driver->command_clear_color_texture(r_command_buffer, texture_clear_command->texture, RDD::TEXTURE_LAYOUT_TRANSFER_DST_OPTIMAL, texture_clear_command->color, texture_clear_command->range);
 			} break;
 			case RecordedCommand::TYPE_TEXTURE_COPY: {
+				print_line("\t RecordedCommand::TYPE_TEXTURE_COPY");
 				const RecordedTextureCopyCommand *texture_copy_command = reinterpret_cast<const RecordedTextureCopyCommand *>(command);
 				driver->command_copy_texture(r_command_buffer, texture_copy_command->from_texture, RDD::TEXTURE_LAYOUT_TRANSFER_SRC_OPTIMAL, texture_copy_command->to_texture, RDD::TEXTURE_LAYOUT_TRANSFER_DST_OPTIMAL, texture_copy_command->region);
 			} break;
 			case RecordedCommand::TYPE_TEXTURE_GET_DATA: {
+				print_line("\t RecordedCommand::TYPE_TEXTURE_GET_DATA");
 				const RecordedTextureGetDataCommand *texture_get_data_command = reinterpret_cast<const RecordedTextureGetDataCommand *>(command);
 				const VectorView<RDD::BufferTextureCopyRegion> command_buffer_texture_copy_regions_view(texture_get_data_command->buffer_texture_copy_regions(), texture_get_data_command->buffer_texture_copy_regions_count);
 				driver->command_copy_texture_to_buffer(r_command_buffer, texture_get_data_command->from_texture, RDD::TEXTURE_LAYOUT_TRANSFER_SRC_OPTIMAL, texture_get_data_command->to_buffer, command_buffer_texture_copy_regions_view);
 			} break;
 			case RecordedCommand::TYPE_TEXTURE_RESOLVE: {
+				print_line("\t RecordedCommand::TYPE_TEXTURE_RESOLVE");
 				const RecordedTextureResolveCommand *texture_resolve_command = reinterpret_cast<const RecordedTextureResolveCommand *>(command);
 				driver->command_resolve_texture(r_command_buffer, texture_resolve_command->from_texture, RDD::TEXTURE_LAYOUT_TRANSFER_SRC_OPTIMAL, texture_resolve_command->src_layer, texture_resolve_command->src_mipmap, texture_resolve_command->to_texture, RDD::TEXTURE_LAYOUT_TRANSFER_DST_OPTIMAL, texture_resolve_command->dst_layer, texture_resolve_command->dst_mipmap);
 			} break;
 			case RecordedCommand::TYPE_TEXTURE_UPDATE: {
+				print_line("\t RecordedCommand::TYPE_TEXTURE_UPDATE");
 				const RecordedTextureUpdateCommand *texture_update_command = reinterpret_cast<const RecordedTextureUpdateCommand *>(command);
 				const RecordedBufferToTextureCopy *command_buffer_to_texture_copies = texture_update_command->buffer_to_texture_copies();
 				for (uint32_t j = 0; j < texture_update_command->buffer_to_texture_copies_count; j++) {
@@ -841,6 +903,7 @@ void RenderingDeviceGraph::_run_render_commands(int32_t p_level, const RecordedC
 				}
 			} break;
 			case RecordedCommand::TYPE_CAPTURE_TIMESTAMP: {
+				print_line("\t RecordedCommand::TYPE_CAPTURE_TIMESTAMP");
 				const RecordedCaptureTimestampCommand *texture_capture_timestamp_command = reinterpret_cast<const RecordedCaptureTimestampCommand *>(command);
 				driver->command_timestamp_write(r_command_buffer, texture_capture_timestamp_command->pool, texture_capture_timestamp_command->index);
 			} break;
@@ -1274,6 +1337,9 @@ void RenderingDeviceGraph::initialize(RDD *p_driver, RenderingContextDriver::Dev
 }
 
 void RenderingDeviceGraph::finalize() {
+
+	print_line("RenderingDeviceGraph::finalize");
+
 	_wait_for_secondary_command_buffer_tasks();
 
 	for (Frame &f : frames) {
@@ -1288,6 +1354,9 @@ void RenderingDeviceGraph::finalize() {
 }
 
 void RenderingDeviceGraph::begin() {
+	print_line("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!");
+	print_line("RenderingDeviceGraph::begin");
+
 	command_data.clear();
 	command_data_offsets.clear();
 	command_normalization_barriers.clear();
@@ -1367,6 +1436,8 @@ void RenderingDeviceGraph::add_buffer_get_data(RDD::BufferID p_src, ResourceTrac
 
 void RenderingDeviceGraph::add_buffer_update(RDD::BufferID p_dst, ResourceTracker *p_dst_tracker, VectorView<RecordedBufferCopy> p_buffer_copies) {
 	DEV_ASSERT(p_dst_tracker != nullptr);
+
+	print_line("RenderingDeviceGraph::add_buffer_update: p_dst.id: ", itos(p_dst.id));
 
 	size_t buffer_copies_size = p_buffer_copies.size() * sizeof(RecordedBufferCopy);
 	uint64_t command_size = sizeof(RecordedBufferUpdateCommand) + buffer_copies_size;
@@ -1815,6 +1886,9 @@ void RenderingDeviceGraph::add_synchronization() {
 }
 
 void RenderingDeviceGraph::begin_label(const String &p_label_name, const Color &p_color) {
+
+	print_line("RenderingDeviceGraph::begin_label: p_label_name: ", p_label_name);
+
 	uint32_t command_label_offset = command_label_chars.size();
 	PackedByteArray command_label_utf8 = p_label_name.to_utf8_buffer();
 	int command_label_utf8_size = command_label_utf8.size();
@@ -1828,10 +1902,14 @@ void RenderingDeviceGraph::begin_label(const String &p_label_name, const Color &
 }
 
 void RenderingDeviceGraph::end_label() {
+	print_line("RenderingDeviceGraph::end_label"); 
 	command_label_index = -1;
 }
 
 void RenderingDeviceGraph::end(bool p_reorder_commands, bool p_full_barriers, RDD::CommandBufferID &r_command_buffer, CommandBufferPool &r_command_buffer_pool) {
+	
+	print_line("RenderingDeviceGraph::end, command_count:", command_count, ", p_reorder_commands: ", p_reorder_commands, ", p_full_barriers: ", p_full_barriers, ", r_command_buffer: ", itos(r_command_buffer.id));
+
 	if (command_count == 0) {
 		// No commands have been logged, do nothing.
 		return;

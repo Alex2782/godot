@@ -186,6 +186,7 @@ void ShaderRD::_build_variant_code(StringBuilder &builder, uint32_t p_variant, c
 				}
 				builder.append("\n"); //make sure defines begin at newline
 				if (p_version->uniforms.size()) {
+					print_line("ShaderRD::_build_variant_code: #define MATERIAL_UNIFORMS_USED");
 					builder.append("#define MATERIAL_UNIFORMS_USED\n");
 				}
 				for (const KeyValue<StringName, CharString> &E : p_version->code_sections) {
@@ -198,6 +199,7 @@ void ShaderRD::_build_variant_code(StringBuilder &builder, uint32_t p_variant, c
 			} break;
 			case StageTemplate::Chunk::TYPE_MATERIAL_UNIFORMS: {
 				builder.append(p_version->uniforms.get_data()); //uniforms (same for vertex and fragment)
+				print_line("\t TYPE_MATERIAL_UNIFORMS: ", p_version->uniforms.get_data());
 			} break;
 			case StageTemplate::Chunk::TYPE_VERTEX_GLOBALS: {
 				builder.append(p_version->vertex_globals.get_data()); // vertex globals

@@ -547,6 +547,29 @@ void RenderingContextDriverVulkan::_check_driver_workarounds(const VkPhysicalDev
 			p_device_properties.deviceID >= 0x6000000 && // Adreno 6xx
 			p_device_properties.driverVersion < VK_MAKE_VERSION(512, 503, 0) &&
 			r_device.name.find("Turnip") < 0;
+
+	print_line("RenderingContextDriverVulkan::_check_driver_workarounds");
+	print_line("\t r_device.vendor: ", r_device.vendor);
+	print_line("\t p_device_properties.deviceID: ", p_device_properties.deviceID);
+
+	uint32_t driverVersion = p_device_properties.driverVersion;
+	String driverVersionStr = vformat("%d.%d.%d", VK_API_VERSION_MAJOR(driverVersion), VK_API_VERSION_MINOR(driverVersion), VK_API_VERSION_PATCH(driverVersion));
+
+	print_line("\t p_device_properties.driverVersion: ", driverVersion, ", Format: ", driverVersionStr);
+	print_line("\t r_device.name: ", r_device.name);
+
+
+	// Workaround for the Adreno 5XX family of devices.
+	//TODO: describe + check 'driverVersion'?
+	r_device.workarounds.force_material_uniform_set =
+		r_device.vendor == VENDOR_QUALCOMM &&
+		p_device_properties.deviceID >= 0x5000000 && // Adreno 5xx
+		p_device_properties.deviceID <= 0x5999999;
+
+	r_device.workarounds.force_material_uniform_set = true; //TODO: Dev-TEST
+	
+	print_line("\t r_device.workarounds.avoid_compute_after_draw: ", r_device.workarounds.avoid_compute_after_draw);
+	print_line("\t r_device.workarounds.force_material_uniform_set: ", r_device.workarounds.force_material_uniform_set);
 }
 
 bool RenderingContextDriverVulkan::_use_validation_layers() const {

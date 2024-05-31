@@ -1056,6 +1056,9 @@ void RendererCanvasRenderRD::_render_item(RD::DrawListID p_draw_list, RID p_rend
 }
 
 RID RendererCanvasRenderRD::_create_base_uniform_set(RID p_to_render_target, bool p_backbuffer) {
+
+	print_line("RendererCanvasRenderRD::_create_base_uniform_set:");
+
 	RendererRD::TextureStorage *texture_storage = RendererRD::TextureStorage::get_singleton();
 	RendererRD::MaterialStorage *material_storage = RendererRD::MaterialStorage::get_singleton();
 
@@ -1192,8 +1195,14 @@ void RendererCanvasRenderRD::_render_items(RID p_to_render_target, int p_item_co
 
 	PipelineVariants *pipeline_variants = &shader.pipeline_variants;
 
+	bool added_material_uniform_set = false;
+
 	for (int i = 0; i < p_item_count; i++) {
 		Item *ci = items[i];
+
+		print_line("\t ==============================");
+		print_line("\t Item ", i);
+		print_line("\t ==============================");
 
 		if (current_clip != ci->final_clip_owner) {
 			current_clip = ci->final_clip_owner;
@@ -1209,6 +1218,8 @@ void RendererCanvasRenderRD::_render_items(RID p_to_render_target, int p_item_co
 
 		RID material = ci->material_owner == nullptr ? ci->material : ci->material_owner->material;
 
+		print_line("\t ci->use_canvas_group: ", ci->use_canvas_group);
+		
 		if (ci->use_canvas_group) {
 			if (ci->canvas_group->mode == RS::CANVAS_GROUP_MODE_CLIP_AND_DRAW) {
 				material = default_clip_children_material;
@@ -1221,6 +1232,10 @@ void RendererCanvasRenderRD::_render_items(RID p_to_render_target, int p_item_co
 					}
 				}
 			}
+		}
+		else if (enable_workaround && added_material_uniform_set && material.is_null() && prev_material.is_valid()) {
+			material = workaround_material;
+			print_line("\t MATERIAL_UNIFORM_SET Adreno 5xx Workaround");
 		}
 
 		if (material != prev_material) {
@@ -1237,6 +1252,7 @@ void RendererCanvasRenderRD::_render_items(RID p_to_render_target, int p_item_co
 					if (uniform_set.is_valid() && RD::get_singleton()->uniform_set_is_valid(uniform_set)) { // Material may not have a uniform set.
 						RD::get_singleton()->draw_list_bind_uniform_set(draw_list, uniform_set, MATERIAL_UNIFORM_SET);
 						material_data->set_as_used();
+						added_material_uniform_set = true;
 					}
 				} else {
 					pipeline_variants = &shader.pipeline_variants;
@@ -1245,6 +1261,24 @@ void RendererCanvasRenderRD::_render_items(RID p_to_render_target, int p_item_co
 				pipeline_variants = &shader.pipeline_variants;
 			}
 		}
+
+		//Adreno 5XX Workaround -> OK
+		//++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+		/*
+		if (!material.is_valid() && prev_material.is_valid() &&
+			RD::get_singleton()->get_device_workarounds().force_material_uniform_set &&
+			added_material_uniform_set) {
+			
+			CanvasMaterialData *material_data = static_cast<CanvasMaterialData *>(material_storage->material_get_data(workaround_material, RendererRD::MaterialStorage::SHADER_TYPE_2D));
+			pipeline_variants = &material_data->shader_data->pipeline_variants;
+			//material = workaround_material;
+			RID uniform_set = material_data->uniform_set;
+			print_line("\t MATERIAL_UNIFORM_SET Adreno 5xx Workaround");
+			RD::get_singleton()->draw_list_bind_uniform_set(draw_list, uniform_set, MATERIAL_UNIFORM_SET);
+			material_data->set_as_used();
+		}
+		*/
+		//-----------------------------------------------------------
 
 		if (!ci->repeat_size.x && !ci->repeat_size.y) {
 			_render_item(draw_list, p_to_render_target, ci, fb_format, canvas_transform_inverse, current_clip, p_lights, pipeline_variants, r_sdf_used, Point2(), r_render_info);
@@ -2163,10 +2197,27 @@ void RendererCanvasRenderRD::occluder_polygon_set_cull_mode(RID p_occluder, RS::
 void RendererCanvasRenderRD::CanvasShaderData::set_code(const String &p_code) {
 	//compile
 
+	print_line("RendererCanvasRenderRD::CanvasShaderData::set_code, p_code.length:", p_code.length());
+	print_line("p_code: ", p_code);
+
+	if (p_code.length() == 65) {
+		print_line("DEBUG");
+	}
+
 	code = p_code;
 	valid = false;
 	ubo_size = 0;
 	uniforms.clear();
+
+	/*
+	print_line("\t ADD Uniform TEST");
+	StringName name = "_TEST";
+	ShaderLanguage::ShaderNode::Uniform uniform;
+	uniform.type = ShaderLanguage::DataType::TYPE_INT;
+	uniform.texture_order = -1;
+	uniforms[name] = uniform;
+	*/
+
 	uses_screen_texture = false;
 	uses_screen_texture_mipmaps = false;
 	uses_sdf = false;
@@ -2197,10 +2248,15 @@ void RendererCanvasRenderRD::CanvasShaderData::set_code(const String &p_code) {
 
 	actions.uniforms = &uniforms;
 
+	print_line("\t actions.uniforms->size: ", actions.uniforms->size());
+
 	RendererCanvasRenderRD *canvas_singleton = static_cast<RendererCanvasRenderRD *>(RendererCanvasRender::singleton);
+
 
 	Error err = canvas_singleton->shader.compiler.compile(RS::SHADER_CANVAS_ITEM, code, &actions, path, gen_code);
 	ERR_FAIL_COND_MSG(err != OK, "Shader compilation failed.");
+
+	print_line("\t actions.uniforms->size: ", actions.uniforms->size());
 
 	uses_screen_texture_mipmaps = gen_code.uses_screen_texture_mipmaps;
 	uses_screen_texture = gen_code.uses_screen_texture;
@@ -2394,11 +2450,17 @@ RendererCanvasRenderRD::CanvasShaderData::~CanvasShaderData() {
 }
 
 RendererRD::MaterialStorage::ShaderData *RendererCanvasRenderRD::_create_shader_func() {
+
+	print_line("RendererCanvasRenderRD::_create_shader_func()");
+
 	CanvasShaderData *shader_data = memnew(CanvasShaderData);
 	return shader_data;
 }
 
 bool RendererCanvasRenderRD::CanvasMaterialData::update_parameters(const HashMap<StringName, Variant> &p_parameters, bool p_uniform_dirty, bool p_textures_dirty) {
+	
+	print_line("RendererCanvasRenderRD::CanvasMaterialData::update_parameters");
+	
 	RendererCanvasRenderRD *canvas_singleton = static_cast<RendererCanvasRenderRD *>(RendererCanvasRender::singleton);
 	bool uniform_set_changed = update_parameters_uniform_set(p_parameters, p_uniform_dirty, p_textures_dirty, shader_data->uniforms, shader_data->ubo_offsets.ptr(), shader_data->texture_uniforms, shader_data->default_texture_params, shader_data->ubo_size, uniform_set, canvas_singleton->shader.canvas_shader.version_get_shader(shader_data->version, 0), MATERIAL_UNIFORM_SET, true, false);
 	bool uniform_set_srgb_changed = update_parameters_uniform_set(p_parameters, p_uniform_dirty, p_textures_dirty, shader_data->uniforms, shader_data->ubo_offsets.ptr(), shader_data->texture_uniforms, shader_data->default_texture_params, shader_data->ubo_size, uniform_set_srgb, canvas_singleton->shader.canvas_shader.version_get_shader(shader_data->version, 0), MATERIAL_UNIFORM_SET, false, false);
@@ -2411,6 +2473,9 @@ RendererCanvasRenderRD::CanvasMaterialData::~CanvasMaterialData() {
 }
 
 RendererRD::MaterialStorage::MaterialData *RendererCanvasRenderRD::_create_material_func(CanvasShaderData *p_shader) {
+	
+	print_line("RendererCanvasRenderRD::_create_material_func");
+	
 	CanvasMaterialData *material_data = memnew(CanvasMaterialData);
 	material_data->shader_data = p_shader;
 	//update will happen later anyway so do nothing.
@@ -2425,6 +2490,17 @@ void RendererCanvasRenderRD::update() {
 }
 
 RendererCanvasRenderRD::RendererCanvasRenderRD() {
+
+	print_line("RendererCanvasRenderRD::RendererCanvasRenderRD");
+
+
+	//workaround_material_data.shader_data = &workarround_shader_data;
+	//workarround_shader_data.set_code(code);
+
+	//print_line("\t workaround_material_data.uniform_set.get_id():", workaround_material_data.uniform_set.get_id());
+	//print_line("\t workaround_material_data.shader_data->uniforms.size:", workaround_material_data.shader_data->uniforms.size());
+	//print_line("\t workaround_material_data.shader_data->ubo_size:", workaround_material_data.shader_data->ubo_size);
+
 	RendererRD::TextureStorage *texture_storage = RendererRD::TextureStorage::get_singleton();
 	RendererRD::MaterialStorage *material_storage = RendererRD::MaterialStorage::get_singleton();
 
@@ -2839,6 +2915,18 @@ void fragment() {
 	}
 
 	static_assert(sizeof(PushConstant) == 128);
+
+	//Adreno 5xx workaround
+	enable_workaround = RD::get_singleton()->get_device_workarounds().force_material_uniform_set;
+	if(enable_workaround) {
+		workaround_shader = material_storage->shader_allocate();
+		material_storage->shader_initialize(workaround_shader);
+		material_storage->shader_set_code(workaround_shader, "shader_type canvas_item;\n");
+
+		workaround_material = material_storage->material_allocate();
+		material_storage->material_initialize(workaround_material);
+		material_storage->material_set_shader(workaround_material, workaround_shader);
+	}
 }
 
 bool RendererCanvasRenderRD::free(RID p_rid) {
@@ -2897,6 +2985,9 @@ RendererCanvasRenderRD::~RendererCanvasRenderRD() {
 
 	material_storage->material_free(default_clip_children_material);
 	material_storage->shader_free(default_clip_children_shader);
+
+	material_storage->material_free(workaround_material);
+	material_storage->shader_free(workaround_shader);
 
 	{
 		if (state.canvas_state_buffer.is_valid()) {

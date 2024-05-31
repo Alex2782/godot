@@ -42,6 +42,8 @@ using namespace RendererSceneRenderImplementation;
 void SceneShaderForwardMobile::ShaderData::set_code(const String &p_code) {
 	//compile
 
+	print_line("SceneShaderForwardMobile::ShaderData::set_code: p_code.size:", p_code.size());
+
 	code = p_code;
 	valid = false;
 	ubo_size = 0;

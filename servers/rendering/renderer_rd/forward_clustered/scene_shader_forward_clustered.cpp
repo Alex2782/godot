@@ -40,6 +40,8 @@ using namespace RendererSceneRenderImplementation;
 void SceneShaderForwardClustered::ShaderData::set_code(const String &p_code) {
 	//compile
 
+	print_line("void SceneShaderForwardClustered::ShaderData::set_code: p_code.size:", p_code.size());
+
 	code = p_code;
 	valid = false;
 	ubo_size = 0;

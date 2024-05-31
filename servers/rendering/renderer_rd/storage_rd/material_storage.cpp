@@ -641,6 +641,9 @@ bool MaterialStorage::ShaderData::is_parameter_texture(const StringName &p_param
 // MaterialStorage::MaterialData
 
 void MaterialStorage::MaterialData::update_uniform_buffer(const HashMap<StringName, ShaderLanguage::ShaderNode::Uniform> &p_uniforms, const uint32_t *p_uniform_offsets, const HashMap<StringName, Variant> &p_parameters, uint8_t *p_buffer, uint32_t p_buffer_size, bool p_use_linear_color) {
+	
+	print_line("MaterialData::update_uniform_buffer, p_buffer_size: ", p_buffer_size);
+	
 	MaterialStorage *material_storage = MaterialStorage::get_singleton();
 	bool uses_global_buffer = false;
 
@@ -697,19 +700,28 @@ void MaterialStorage::MaterialData::update_uniform_buffer(const HashMap<StringNa
 
 		if (V) {
 			//user provided
+			print_line("\t _fill_std140_variant_ubo_value: type: ", E.value.type, ", array_size: ", E.value.array_size, ", V->value: ", V->value);
 			_fill_std140_variant_ubo_value(E.value.type, E.value.array_size, V->value, data, p_use_linear_color);
 
 		} else if (E.value.default_value.size()) {
 			//default value
+			print_line("\t _fill_std140_ubo_value: type: ", E.value.type, ", default_value.size: ", E.value.default_value.size());
 			_fill_std140_ubo_value(E.value.type, E.value.default_value, data);
 			//value=E.value.default_value;
 		} else {
 			//zero because it was not provided
 			if ((E.value.type == ShaderLanguage::TYPE_VEC3 || E.value.type == ShaderLanguage::TYPE_VEC4) && E.value.hint == ShaderLanguage::ShaderNode::Uniform::HINT_SOURCE_COLOR) {
 				//colors must be set as black, with alpha as 1.0
+				print_line("\t _fill_std140_variant_ubo_value: type: ", E.value.type, ", E.value.array_size: ", E.value.array_size, ", VALUE = Color(0, 0, 0, 1)");
 				_fill_std140_variant_ubo_value(E.value.type, E.value.array_size, Color(0, 0, 0, 1), data, p_use_linear_color);
 			} else {
 				//else just zero it out
+				//TODO: Debug, force Uniform Set 1
+				//Logs: _fill_std140_ubo_empty: type:  5 , E.value.array_size:  0
+				if (E.value.type == 5) {
+					print_line("TODO Debug");
+				}
+				print_line("\t _fill_std140_ubo_empty: type: ", E.value.type, ", E.value.array_size: ", E.value.array_size);
 				_fill_std140_ubo_empty(E.value.type, E.value.array_size, data);
 			}
 		}
@@ -980,6 +992,9 @@ void MaterialStorage::MaterialData::update_textures(const HashMap<StringName, Va
 }
 
 void MaterialStorage::MaterialData::free_parameters_uniform_set(RID p_uniform_set) {
+
+	print_line("MaterialStorage::MaterialData::free_parameters_uniform_set: p_uniform_set", itos(p_uniform_set.get_id()));
+
 	if (p_uniform_set.is_valid() && RD::get_singleton()->uniform_set_is_valid(p_uniform_set)) {
 		RD::get_singleton()->uniform_set_set_invalidation_callback(p_uniform_set, nullptr, nullptr);
 		RD::get_singleton()->free(p_uniform_set);
@@ -987,6 +1002,21 @@ void MaterialStorage::MaterialData::free_parameters_uniform_set(RID p_uniform_se
 }
 
 bool MaterialStorage::MaterialData::update_parameters_uniform_set(const HashMap<StringName, Variant> &p_parameters, bool p_uniform_dirty, bool p_textures_dirty, const HashMap<StringName, ShaderLanguage::ShaderNode::Uniform> &p_uniforms, const uint32_t *p_uniform_offsets, const Vector<ShaderCompiler::GeneratedCode::Texture> &p_texture_uniforms, const HashMap<StringName, HashMap<int, RID>> &p_default_texture_params, uint32_t p_ubo_size, RID &uniform_set, RID p_shader, uint32_t p_shader_uniform_set, bool p_use_linear_color, bool p_3d_material) {
+	
+	print_line("MaterialStorage::MaterialData::update_parameters_uniform_set");
+	print_line("\t p_parameters.size: ", p_parameters.size());
+	print_line("\t p_uniform_dirty: ", p_uniform_dirty);
+	print_line("\t p_textures_dirty: ", p_textures_dirty);
+	print_line("\t p_ubo_size: ", p_ubo_size);
+	print_line("\t p_uniforms.size:", p_uniforms.size());
+	print_line("\t p_shader_uniform_set:", p_shader_uniform_set);
+
+	if (p_shader_uniform_set == 1 && p_ubo_size > 0) {
+		print_line("DEBUG");
+	}
+
+	//TODO: DEBUG
+	
 	if ((uint32_t)ubo_data.size() != p_ubo_size) {
 		p_uniform_dirty = true;
 		if (uniform_buffer.is_valid()) {
@@ -1845,11 +1875,26 @@ void MaterialStorage::shader_free(RID p_rid) {
 }
 
 void MaterialStorage::shader_set_code(RID p_shader, const String &p_code) {
+
+	print_line("MaterialStorage::shader_set_code");
+
 	Shader *shader = shader_owner.get_or_null(p_shader);
 	ERR_FAIL_NULL(shader);
 
-	shader->code = p_code;
-	String mode_string = ShaderLanguage::get_shader_type(p_code);
+	String shader_code = p_code;
+	String mode_string = ShaderLanguage::get_shader_type(shader_code);
+
+	//TODO: Adreno 5xx Workaround
+	if (RD::get_singleton()->get_device_workarounds().force_material_uniform_set) {
+		String workaround_code = "\n\nuniform int __ADRENO_5XX_WORKAROUND;\n";
+		String shader_type = "shader_type " + mode_string + ";";
+		int insert_pos = shader_code.find(shader_type) + shader_type.length();
+		shader_code = shader_code.insert(insert_pos, workaround_code);
+		print_line("\t insert_pos: ", insert_pos);
+	}
+
+	shader->code = shader_code;
+
 
 	ShaderType new_type;
 	if (mode_string == "canvas_item") {
@@ -1911,7 +1956,7 @@ void MaterialStorage::shader_set_code(RID p_shader, const String &p_code) {
 
 	if (shader->data) {
 		shader->data->set_path_hint(shader->path_hint);
-		shader->data->set_code(p_code);
+		shader->data->set_code(shader_code);
 	}
 
 	for (Material *E : shader->owners) {
@@ -2008,6 +2053,9 @@ RS::ShaderNativeSourceCode MaterialStorage::shader_get_native_source_code(RID p_
 /* MATERIAL API */
 
 void MaterialStorage::_material_uniform_set_erased(void *p_material) {
+
+	print_line("MaterialStorage::_material_uniform_set_erased");
+
 	RID rid = *(RID *)p_material;
 	Material *material = MaterialStorage::get_singleton()->get_material(rid);
 	if (material) {
@@ -2080,6 +2128,9 @@ void MaterialStorage::material_free(RID p_rid) {
 }
 
 void MaterialStorage::material_set_shader(RID p_material, RID p_shader) {
+
+	print_line("MaterialStorage::material_set_shader: p_material: ", itos(p_material.get_id()), ", p_shader: ", itos(p_shader.get_id()));
+
 	Material *material = material_owner.get_or_null(p_material);
 	ERR_FAIL_NULL(material);
 
@@ -2102,6 +2153,13 @@ void MaterialStorage::material_set_shader(RID p_material, RID p_shader) {
 
 	Shader *shader = get_shader(p_shader);
 	ERR_FAIL_NULL(shader);
+
+	print_line("\t shader, uniforms.size: ", shader->data->uniforms.size());
+
+	if (shader->code.length() == 65) {
+		print_line("DEBUG");
+	}
+
 	material->shader = shader;
 	material->shader_type = shader->type;
 	material->shader_id = p_shader.get_local_index();

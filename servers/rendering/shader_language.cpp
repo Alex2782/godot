@@ -8033,6 +8033,9 @@ Error ShaderLanguage::_validate_precision(DataType p_type, DataPrecision p_preci
 }
 
 Error ShaderLanguage::_parse_shader(const HashMap<StringName, FunctionInfo> &p_functions, const Vector<ModeInfo> &p_render_modes, const HashSet<String> &p_shader_types) {
+	
+	print_line("ShaderLanguage::_parse_shader: ");
+	
 	Token tk;
 	TkPos prev_pos;
 	Token next;
@@ -8608,6 +8611,10 @@ Error ShaderLanguage::_parse_shader(const HashMap<StringName, FunctionInfo> &p_f
 					uniform.array_size = array_size;
 					uniform.group = current_uniform_group_name;
 					uniform.subgroup = current_uniform_subgroup_name;
+					print_line("\t ShaderNode::Uniform: type: ", type, ", uniform_scope: ", uniform_scope, 
+								", precision: ", precision, ", array_size:", array_size, 
+								", current_uniform_group_name:", current_uniform_group_name, 
+								", current_uniform_subgroup_name: ", current_uniform_subgroup_name);
 
 					tk = _get_token();
 					if (tk.type == TK_BRACKET_OPEN) {
@@ -8639,6 +8646,7 @@ Error ShaderLanguage::_parse_shader(const HashMap<StringName, FunctionInfo> &p_f
 						uniform.texture_order = -1;
 						if (uniform_scope != ShaderNode::Uniform::SCOPE_INSTANCE) {
 							uniform.order = uniforms++;
+							print_line("\t uniforms: ", uniforms);
 #ifdef DEBUG_ENABLED
 							if (check_device_limit_warnings) {
 								if (uniform.array_size > 0) {
@@ -9020,7 +9028,12 @@ Error ShaderLanguage::_parse_shader(const HashMap<StringName, FunctionInfo> &p_f
 						tk = _get_token();
 					}
 
+					print_line("\t shader->uniforms: name: ", name, ", uniform.type: ", uniform.type);
 					shader->uniforms[name] = uniform;
+					if (name == "__ADRENO_5XX_WORKAROUND") {
+						print_line("TODO Debug");
+					}
+
 #ifdef DEBUG_ENABLED
 					if (check_warnings && HAS_WARNING(ShaderWarning::UNUSED_UNIFORM_FLAG)) {
 						used_uniforms.insert(name, Usage(tk_line));
@@ -10027,6 +10040,8 @@ uint32_t ShaderLanguage::get_warning_flags() const {
 #endif // DEBUG_ENABLED
 
 Error ShaderLanguage::compile(const String &p_code, const ShaderCompileInfo &p_info) {
+	print_line("ShaderLanguage::compile: p_code.length:", p_code.length());
+
 	clear();
 	is_shader_inc = p_info.is_include;
 
@@ -10039,6 +10054,18 @@ Error ShaderLanguage::compile(const String &p_code, const ShaderCompileInfo &p_i
 
 	shader = alloc_node<ShaderNode>();
 	Error err = _parse_shader(p_info.functions, p_info.render_modes, p_info.shader_types);
+
+	//TODO: entfernen?
+	/*
+	if (shader->uniforms.size() == 0) {
+		print_line("\t ADD Uniform TEST");
+		StringName name = "_TEST";
+		ShaderNode::Uniform uniform;
+		uniform.type = ShaderLanguage::DataType::TYPE_INT;
+		uniform.texture_order = -1;
+		shader->uniforms[name] = uniform;
+	}
+	*/
 
 #ifdef DEBUG_ENABLED
 	if (check_warnings) {

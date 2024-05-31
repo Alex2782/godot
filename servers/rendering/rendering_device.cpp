@@ -37,6 +37,7 @@
 #include "core/io/dir_access.h"
 
 #define FORCE_SEPARATE_PRESENT_QUEUE 0
+#define DEBUG_ENABLED 1
 
 /**************************/
 /**** HELPER FUNCTIONS ****/
@@ -390,6 +391,8 @@ Error RenderingDevice::_buffer_update(Buffer *p_buffer, RID p_buffer_id, size_t 
 	size_t to_submit = p_data_size;
 	size_t submit_from = 0;
 
+	print_line("RenderingDevice::_buffer_update: p_buffer_id: ", itos(p_buffer_id.get_id()), ", p_data_size: ", itos(p_data_size), ", p_use_draw_queue: ", p_use_draw_queue);
+
 	thread_local LocalVector<RDG::RecordedBufferCopy> command_buffer_copies_vector;
 	command_buffer_copies_vector.clear();
 
@@ -462,6 +465,8 @@ Error RenderingDevice::_buffer_update(Buffer *p_buffer, RID p_buffer_id, size_t 
 Error RenderingDevice::buffer_copy(RID p_src_buffer, RID p_dst_buffer, uint32_t p_src_offset, uint32_t p_dst_offset, uint32_t p_size) {
 	_THREAD_SAFE_METHOD_
 
+	print_line("RenderingDevice::buffer_copy: p_src_buffer:", itos(p_src_buffer.get_id()), ", p_dst_buffer: ", itos(p_dst_buffer.get_id()), ", p_src_offset: ", p_src_offset, ", p_dst_offset:", p_dst_offset, ", p_size: ", p_size);
+
 	ERR_FAIL_COND_V_MSG(draw_list, ERR_INVALID_PARAMETER,
 			"Copying buffers is forbidden during creation of a draw list");
 	ERR_FAIL_COND_V_MSG(compute_list, ERR_INVALID_PARAMETER,
@@ -500,6 +505,8 @@ Error RenderingDevice::buffer_copy(RID p_src_buffer, RID p_dst_buffer, uint32_t 
 Error RenderingDevice::buffer_update(RID p_buffer, uint32_t p_offset, uint32_t p_size, const void *p_data) {
 	_THREAD_SAFE_METHOD_
 
+	print_line("RenderingDevice::buffer_update, p_buffer: ", itos(p_buffer.get_id()), ", p_offset: ", p_offset, ", p_size: ", p_size );
+
 	ERR_FAIL_COND_V_MSG(draw_list, ERR_INVALID_PARAMETER,
 			"Updating buffers is forbidden during creation of a draw list");
 	ERR_FAIL_COND_V_MSG(compute_list, ERR_INVALID_PARAMETER,
@@ -518,6 +525,8 @@ Error RenderingDevice::buffer_update(RID p_buffer, uint32_t p_offset, uint32_t p
 
 Error RenderingDevice::buffer_clear(RID p_buffer, uint32_t p_offset, uint32_t p_size) {
 	_THREAD_SAFE_METHOD_
+
+	print_line("RenderingDevice::buffer_clear: p_buffer: ", itos(p_buffer.get_id()), ", p_offset:", p_offset, ", p_size:", p_size);
 
 	ERR_FAIL_COND_V_MSG((p_size % 4) != 0, ERR_INVALID_PARAMETER,
 			"Size must be a multiple of four");
@@ -546,6 +555,8 @@ Error RenderingDevice::buffer_clear(RID p_buffer, uint32_t p_offset, uint32_t p_
 
 Vector<uint8_t> RenderingDevice::buffer_get_data(RID p_buffer, uint32_t p_offset, uint32_t p_size) {
 	_THREAD_SAFE_METHOD_
+
+	print_line("RenderingDevice::buffer_get_data: p_buffer: ", itos(p_buffer.get_id()), ", p_offset:",p_offset, ", p_size:", p_size);
 
 	Buffer *buffer = _get_buffer_from_owner(p_buffer);
 	if (!buffer) {
@@ -2501,9 +2512,12 @@ RID RenderingDevice::uniform_buffer_create(uint32_t p_size_bytes, const Vector<u
 
 	ERR_FAIL_COND_V(p_data.size() && (uint32_t)p_data.size() != p_size_bytes, RID());
 
+	print_line("RenderingDevice::uniform_buffer_create, p_size_bytes: ", itos(p_size_bytes));
+
 	Buffer buffer;
 	buffer.size = p_size_bytes;
-	buffer.usage = (RDD::BUFFER_USAGE_TRANSFER_TO_BIT | RDD::BUFFER_USAGE_UNIFORM_BIT);
+	//buffer.usage = (RDD::BUFFER_USAGE_TRANSFER_TO_BIT | RDD::BUFFER_USAGE_UNIFORM_BIT);
+	buffer.usage = (RDD::BUFFER_USAGE_UNIFORM_BIT);
 	buffer.driver_id = driver->buffer_create(buffer.size, buffer.usage, RDD::MEMORY_ALLOCATION_TYPE_GPU);
 	ERR_FAIL_COND_V(!buffer.driver_id, RID());
 
@@ -2898,6 +2912,9 @@ bool RenderingDevice::uniform_set_is_valid(RID p_uniform_set) {
 
 void RenderingDevice::uniform_set_set_invalidation_callback(RID p_uniform_set, InvalidationCallback p_callback, void *p_userdata) {
 	UniformSet *us = uniform_set_owner.get_or_null(p_uniform_set);
+
+	print_line("RenderingDevice::uniform_set_set_invalidation_callback: shader: ", itos(us->shader_id.get_id()), ", shader_set:", us->shader_set);
+
 	ERR_FAIL_NULL(us);
 	us->invalidated_callback = p_callback;
 	us->invalidated_callback_userdata = p_userdata;
@@ -3037,6 +3054,8 @@ RID RenderingDevice::render_pipeline_create(RID p_shader, FramebufferFormatID p_
 	pipeline.shader = p_shader;
 	pipeline.shader_driver_id = shader->driver_id;
 	pipeline.shader_layout_hash = shader->layout_hash;
+
+	print_line("RenderingDevice::render_pipeline_create: pipeline.set_formats = ", shader->set_formats.size());
 	pipeline.set_formats = shader->set_formats;
 	pipeline.push_constant_size = shader->push_constant_size;
 	pipeline.stage_bits = shader->stage_bits;
@@ -3543,6 +3562,9 @@ void RenderingDevice::draw_list_set_blend_constants(DrawListID p_list, const Col
 }
 
 void RenderingDevice::draw_list_bind_render_pipeline(DrawListID p_list, RID p_render_pipeline) {
+
+	print_line("RenderingDevice::draw_list_bind_render_pipeline: p_list: ", itos(p_list), ", p_render_pipeline: ", itos(p_render_pipeline.get_id()));
+
 	DrawList *dl = _get_draw_list_ptr(p_list);
 	ERR_FAIL_NULL(dl);
 #ifdef DEBUG_ENABLED
@@ -3590,8 +3612,12 @@ void RenderingDevice::draw_list_bind_render_pipeline(DrawListID p_list, RID p_re
 			} break;
 		}
 
+		//first_invalid_set = 0;
+		print_line("\t dl->state.set_count: ", dl->state.set_count, ", pcount: ", pcount, ", first_invalid_set: ", first_invalid_set); 
+
 		for (uint32_t i = 0; i < pcount; i++) {
 			dl->state.sets[i].bound = dl->state.sets[i].bound && i < first_invalid_set;
+			print_line("\t ", i, ", pipeline_expected_format = ", pformats[i]);
 			dl->state.sets[i].pipeline_expected_format = pformats[i];
 		}
 
@@ -3643,6 +3669,8 @@ void RenderingDevice::draw_list_bind_uniform_set(DrawListID p_list, RID p_unifor
 	if (p_index > dl->state.set_count) {
 		dl->state.set_count = p_index;
 	}
+
+	print_line("RenderingDevice::draw_list_bind_uniform_set p_index:", p_index, ", format: ", uniform_set->format);
 
 	dl->state.sets[p_index].uniform_set_driver_id = uniform_set->driver_id; // Update set pointer.
 	dl->state.sets[p_index].bound = false; // Needs rebind.
@@ -3733,6 +3761,9 @@ void RenderingDevice::draw_list_set_line_width(DrawListID p_list, float p_width)
 }
 
 void RenderingDevice::draw_list_set_push_constant(DrawListID p_list, const void *p_data, uint32_t p_data_size) {
+
+	print_line("RenderingDevice::draw_list_set_push_constant: p_list:", itos(p_list), "p_data_size: ", p_data_size);
+
 	DrawList *dl = _get_draw_list_ptr(p_list);
 	ERR_FAIL_NULL(dl);
 
@@ -3815,7 +3846,11 @@ void RenderingDevice::draw_list_draw(DrawListID p_list, bool p_use_indices, uint
 	}
 
 	// Bind descriptor sets.
+	print_line("\t --> Bind descriptor sets:");
 	for (uint32_t i = 0; i < dl->state.set_count; i++) {
+
+		print_line("\t ",i, dl->state.sets[i].pipeline_expected_format, dl->state.sets[i].bound);
+
 		if (dl->state.sets[i].pipeline_expected_format == 0) {
 			continue; // Nothing expected by this pipeline.
 		}
@@ -4505,6 +4540,9 @@ bool RenderingDevice::_index_array_make_mutable(IndexArray *p_index_array, RDG::
 }
 
 bool RenderingDevice::_uniform_set_make_mutable(UniformSet *p_uniform_set, RID p_resource_id, RDG::ResourceTracker *p_resource_tracker) {
+	
+	print_line("RenderingDevice::_uniform_set_make_mutable: format: ", itos(p_uniform_set->format), ", p_resource_id: ", itos(p_resource_id.get_id()));
+	
 	HashMap<RID, RDG::ResourceUsage>::Iterator E = p_uniform_set->untracked_usage.find(p_resource_id);
 	if (!E) {
 		// Uniform set thinks the resource is already tracked or does not use it.
@@ -6435,6 +6473,9 @@ RID RenderingDevice::_shader_create_from_spirv(const Ref<RDShaderSPIRV> &p_spirv
 }
 
 RID RenderingDevice::_uniform_set_create(const TypedArray<RDUniform> &p_uniforms, RID p_shader, uint32_t p_shader_set) {
+
+	print_line("RenderingDevice::_uniform_set_create: p_shader: ", itos(p_shader.get_id()), ", p_shader_set: ", p_shader_set);
+
 	Vector<Uniform> uniforms;
 	uniforms.resize(p_uniforms.size());
 	for (int i = 0; i < p_uniforms.size(); i++) {
@@ -6446,6 +6487,7 @@ RID RenderingDevice::_uniform_set_create(const TypedArray<RDUniform> &p_uniforms
 }
 
 Error RenderingDevice::_buffer_update_bind(RID p_buffer, uint32_t p_offset, uint32_t p_size, const Vector<uint8_t> &p_data) {
+	print_line("RenderingDevice::_buffer_update_bind, p_buffer:", itos(p_buffer.get_id()));
 	return buffer_update(p_buffer, p_offset, p_size, p_data.ptr());
 }
 
