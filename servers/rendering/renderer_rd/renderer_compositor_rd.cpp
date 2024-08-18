@@ -281,9 +281,12 @@ RendererCompositorRD::RendererCompositorRD() {
 				shader_cache_dir = shader_cache_dir.path_join("shader_cache");
 
 				bool shader_cache_enabled = GLOBAL_GET("rendering/shader_compiler/shader_cache/enabled");
-				if (!Engine::get_singleton()->is_editor_hint() && !shader_cache_enabled) {
+				//if (!Engine::get_singleton()->is_editor_hint() && !shader_cache_enabled) {
+				if (!shader_cache_enabled) {
 					shader_cache_dir = String(); //disable only if not editor
 				}
+
+				print_line("shader_cache_dir: ", shader_cache_dir);
 
 				if (!shader_cache_dir.is_empty()) {
 					bool compress = GLOBAL_GET("rendering/shader_compiler/shader_cache/compress");
