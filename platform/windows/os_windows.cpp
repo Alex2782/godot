@@ -1860,8 +1860,17 @@ String OS_Windows::get_cache_path() const {
 String OS_Windows::get_tmp_path() const {
 	static String tmp_path_cache;
 	if (tmp_path_cache.is_empty()) {
-		if (tmp_path_cache.is_empty() && has_environment("TEMP")) {
-			tmp_path_cache = get_environment("TEMP").replace("\\", "/");
+		{
+			// Get the tmp path from the Windows API.
+			void *get_temp_path = (void *)GetProcAddress(GetModuleHandleA("kernel32.dll"), "GetTempPathW");
+			if (get_temp_path) {
+				Vector<WCHAR> tmp_path;
+				tmp_path.resize(MAX_PATH);
+				DWORD tmp_path_length = GetTempPathW(MAX_PATH, (LPWSTR)tmp_path.ptrw());
+				if (tmp_path_length > 0 && tmp_path_length < MAX_PATH) {
+					tmp_path_cache = String::utf16((const char16_t *)tmp_path.ptr(), tmp_path_length / sizeof(WCHAR));
+				}
+			}
 		}
 		if (tmp_path_cache.is_empty()) {
 			tmp_path_cache = get_config_path();
