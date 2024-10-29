@@ -874,12 +874,14 @@ void CodeTextEditor::input(const Ref<InputEvent> &event) {
 		return;
 	}
 	if (ED_IS_SHORTCUT("script_text_editor/duplicate_selection", key_event)) {
-		text_editor->duplicate_selection();
+		//text_editor->duplicate_selection();
+		print_line("CodeTextEditor::input -> duplicate_selection");
 		accept_event();
 		return;
 	}
 	if (ED_IS_SHORTCUT("script_text_editor/duplicate_lines", key_event)) {
-		text_editor->duplicate_lines();
+		//text_editor->duplicate_lines();
+		print_line("CodeTextEditor::input -> duplicate_lines");
 		accept_event();
 		return;
 	}

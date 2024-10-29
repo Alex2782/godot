@@ -1371,10 +1371,12 @@ void ScriptTextEditor::_edit_option(int p_op) {
 			code_editor->get_text_editor()->delete_lines();
 		} break;
 		case EDIT_DUPLICATE_SELECTION: {
-			code_editor->get_text_editor()->duplicate_selection();
+			//code_editor->get_text_editor()->duplicate_selection();
+			print_line("ScriptTextEditor::_edit_option -> duplicate_selection");
 		} break;
 		case EDIT_DUPLICATE_LINES: {
-			code_editor->get_text_editor()->duplicate_lines();
+			//code_editor->get_text_editor()->duplicate_lines();
+			print_line("ScriptTextEditor::_edit_option -> duplicate_lines");
 		} break;
 		case EDIT_TOGGLE_FOLD_LINE: {
 			tx->toggle_foldable_lines_at_carets();

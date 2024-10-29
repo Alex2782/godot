@@ -2514,6 +2514,10 @@ void CodeEdit::delete_lines() {
 }
 
 void CodeEdit::duplicate_selection() {
+
+	print_line("CodeEdit::duplicate_selection()");
+	return;
+
 	begin_complex_operation();
 	begin_multicaret_edit();
 
@@ -2552,6 +2556,10 @@ void CodeEdit::duplicate_selection() {
 }
 
 void CodeEdit::duplicate_lines() {
+
+	print_line("CodeEdit::duplicate_lines()");
+	return;
+
 	begin_complex_operation();
 	begin_multicaret_edit();
 
