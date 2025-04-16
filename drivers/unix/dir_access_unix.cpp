@@ -336,8 +336,9 @@ Error DirAccessUnix::make_dir(String p_dir) {
 
 Error DirAccessUnix::change_dir(String p_dir) {
 	GLOBAL_LOCK_FUNCTION
-
+	print_line("DirAccessUnix::change_dir, p_dir: ", p_dir);
 	p_dir = fix_path(p_dir);
+	print_line("fix_path -> p_dir: ", p_dir);
 
 	// prev_dir is the directory we are changing out of
 	String prev_dir;

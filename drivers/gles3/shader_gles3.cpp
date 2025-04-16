@@ -793,6 +793,7 @@ void ShaderGLES3::initialize(const String &p_general_defines, int p_base_texture
 
 		base_sha256 = hash_build.as_string().sha256_text();
 
+		print_line("ShaderGLES3::initialize, shader_cache_dir: ", shader_cache_dir);
 		Ref<DirAccess> d = DirAccess::open(shader_cache_dir);
 		ERR_FAIL_COND(d.is_null());
 		if (d->change_dir(name) != OK) {
