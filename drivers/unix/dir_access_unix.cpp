@@ -342,7 +342,11 @@ Error DirAccessUnix::change_dir(String p_dir) {
 
 	// prev_dir is the directory we are changing out of
 	String prev_dir;
-	char real_current_dir_name[2048];
+	char real_current_dir_name[2048] = {0};
+
+	getcwd(real_current_dir_name, 2048);
+	print_line("getcwd errno: ", errno, ", real_current_dir_name: ", real_current_dir_name);
+
 	ERR_FAIL_NULL_V(getcwd(real_current_dir_name, 2048), ERR_BUG);
 	if (prev_dir.append_utf8(real_current_dir_name) != OK) {
 		prev_dir = real_current_dir_name; //no utf8, maybe latin?
@@ -571,7 +575,11 @@ DirAccessUnix::DirAccessUnix() {
 	/* determine drive count */
 
 	// set current directory to an absolute path of the current directory
-	char real_current_dir_name[2048];
+	char real_current_dir_name[2048] = {0};
+
+	getcwd(real_current_dir_name, 2048);
+	print_line("getcwd errno: ", errno, ", real_current_dir_name: ", real_current_dir_name);
+
 	ERR_FAIL_NULL(getcwd(real_current_dir_name, 2048));
 	current_dir.clear();
 	if (current_dir.append_utf8(real_current_dir_name) != OK) {
