@@ -437,8 +437,18 @@ void EditorResourcePreview::_idle_callback() {
 	if (processing) {
 		return;
 	}
-
-	singleton->_iterate();
+	
+	if (!singleton->queue.is_empty()) {
+		OS *os = OS::get_singleton();
+		uint64_t start = os->get_ticks_msec();
+		while (!singleton->queue.is_empty()) {
+			singleton->_iterate();
+			// _iterate() for 10 ms
+			if (os->get_ticks_msec() - start > 10) {
+				break;
+			}
+		}
+	}
 }
 
 EditorProgress *EditorResourcePreview::thumbnail_progress = nullptr; // it's static
@@ -455,7 +465,8 @@ void EditorResourcePreview::_update_progress_bar() {
 	// Create progress bar if not present
 	if (!singleton->queue.is_empty() && thumbnail_progress == nullptr && singleton->progress_total_steps == -1) {
 		singleton->progress_total_steps = singleton->queue.size();
-		thumbnail_progress = memnew(EditorProgress("generate_thumbnails", "Generate Thumbnails", singleton->progress_total_steps));
+		thumbnail_progress = memnew(EditorProgress("generate_thumbnails", "Generate Thumbnails", singleton->progress_total_steps, false, true));
+		print_line("Generate Thumbnails START: ", OS::get_singleton()->get_ticks_msec());
 	}
 
 	// Update progress bar
@@ -477,8 +488,8 @@ void EditorResourcePreview::_update_progress_bar() {
 	if (singleton->queue.is_empty() && thumbnail_progress != nullptr) {
 		memdelete(thumbnail_progress);
 		thumbnail_progress = nullptr;
+		print_line("Generate Thumbnails FINISH: ", OS::get_singleton()->get_ticks_msec());
 	}
-	return;
 }
 
 void EditorResourcePreview::_update_thumbnail_sizes() {
