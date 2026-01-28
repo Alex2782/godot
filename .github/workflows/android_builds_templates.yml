@@ -1,4 +1,4 @@
-name: 🤖 Android Template Builds (arm32 + arm64 / release + debug)
+name: 🤖 Android Template Builds (release, only arm)
 on:
   workflow_call:
   workflow_dispatch:
@@ -19,17 +19,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        include:
-          - name: Template arm32 (target=template_debug, arch=arm32)
-            cache-name: android-template-arm32
-            target: template_debug
-            scons-flags: arch=arm32
-
-          - name: Template arm64 (target=template_debug, arch=arm64)
-            cache-name: android-template-arm64
-            target: template_debug
-            scons-flags: arch=arm64
-            
+        include:            
           - name: Template arm32 (target=template_release, arch=arm32)
             cache-name: android-template-arm32
             target: template_release
@@ -79,9 +69,14 @@ jobs:
         continue-on-error: true
 
       - name: Generate Godot templates
-        if: matrix.target == 'template_debug'
+        if: matrix.target == 'template_release'
         run: |
           cd platform/android/java
           ./gradlew generateGodotTemplates
           cd ../../..
           ls -l bin/
+
+      - name: Upload artifact
+        uses: ./.github/actions/upload-artifact
+        with:
+          name: ${{ matrix.cache-name }}
