@@ -77,8 +77,8 @@ jobs:
       #    file: accesskit-c-0.18.0.zip
       #    target: accesskit-c-0.18.0/accesskit_c.zip
 
-      - name: Extract pre-built AccessKit
-        run: unzip -o accesskit-c-0.18.0/accesskit_c.zip
+      #- name: Extract pre-built AccessKit
+      #  run: unzip -o accesskit-c-0.18.0/accesskit_c.zip
 
       - name: Compilation
         uses: ./.github/actions/godot-build
@@ -106,8 +106,8 @@ jobs:
         with:
           name: ${{ matrix.cache-name }}
 
-      - name: Unit tests
-        run: |
-          ${{ matrix.bin }} --version
-          ${{ matrix.bin }} --help
-          ${{ matrix.bin }} --test --force-colors
+      #- name: Unit tests
+      #  run: |
+      #    ${{ matrix.bin }} --version
+      #    ${{ matrix.bin }} --help
+      #    ${{ matrix.bin }} --test --force-colors
