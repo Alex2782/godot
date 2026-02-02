@@ -28,7 +28,7 @@ jobs:
             # MinGW takes MUCH longer to compile; save time by only targeting Template.
             target: template_release
             scons-flags: use_mingw=yes
-            bin: ./bin/godot.windows.template_release.x86_64.console.exe
+            #bin: ./bin/godot.windows.template_release.x86_64.console.exe
             compiler: gcc
 
     steps:
@@ -96,12 +96,12 @@ jobs:
         continue-on-error: true
 
       - name: Prepare artifact
-        if: matrix.compiler == 'msvc'
+        #if: matrix.compiler == 'msvc'
         run: |
           Remove-Item bin/* -Include *.exp,*.lib,*.pdb -Force
 
       - name: Upload artifact
-        if: matrix.compiler == 'msvc'
+        #if: matrix.compiler == 'msvc'
         uses: ./.github/actions/upload-artifact
         with:
           name: ${{ matrix.cache-name }}
